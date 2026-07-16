@@ -1,0 +1,1309 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ORETRACK | Enterprise Logistics - Final Version</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        :root { --bg-dark: #0a0a0a; --bg-card: #141414; --accent-gold: #b88a14; --accent-gold-light: #d4a017; --border-color: #262626; --error-red: #ef4444; }
+        body { background-color: var(--bg-dark); color: #e5e7eb; font-family: 'Inter', sans-serif; overflow-x: hidden; }
+        .sidebar { transition: transform 0.3s ease; z-index: 50; }
+        .sidebar-closed { transform: translateX(-100%); }
+        .card { background-color: var(--bg-card); border: 1px solid var(--border-color); box-shadow: 0 4px 20px rgba(0,0,0,0.6); }
+        .btn-gold { background: linear-gradient(135deg, var(--accent-gold-light), var(--accent-gold)); color: #000; font-weight: 600; }
+        .input-field { background-color: #1a1a1a; border: 1px solid var(--border-color); color: #fff; }
+        .step-container { position: relative; width: 100%; max-width: 800px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; }
+        .step-line-bg { position: absolute; top: 16px; left: 0; right: 0; height: 2px; background: #262626; z-index: 1; }
+        .step-line-progress { position: absolute; top: 16px; left: 0; height: 2px; background: var(--accent-gold); z-index: 2; transition: width 0.4s ease; }
+        .step-node { position: relative; z-index: 3; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+        .step-circle { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: bold; }
+        #map, #route-map, #admin-detail-map { height: 280px; width: 100%; border-radius: 16px; border: 1px solid var(--border-color); }
+        .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.85); backdrop-filter: blur(4px); z-index: 9999; display: flex; align-items: center; justify-content: center; padding: 1rem; }
+        .radio-custom { appearance: none; width: 18px; height: 18px; border: 2px solid #444; border-radius: 50%; cursor: pointer; }
+        .radio-custom:checked { background-color: #fff; border-color: #fff; box-shadow: inset 0 0 0 3px #1a1a1a; }
+        .truck-count-label { background: #22c55e; color: black; font-size: 11px; font-weight: bold; padding: 2px 6px; border-radius: 50%; border: 2px solid white; }
+        @keyframes pulse-glow { 0% { box-shadow: 0 0 0 0 rgba(79, 70, 229, 0.7); } 70% { box-shadow: 0 0 0 10px rgba(79, 70, 229, 0); } 100% { box-shadow: 0 0 0 0 rgba(79, 70, 229, 0); } }
+        .animate-pulse-glow { animation: pulse-glow 2s infinite; }
+    </style>
+</head>
+<body class="antialiased">
+
+    <div id="sidebar-overlay" onclick="toggleMenu()" class="fixed inset-0 bg-black/70 z-40 hidden md:hidden"></div>
+
+    <div class="flex h-screen relative">
+        <aside id="sidebar" class="sidebar sidebar-closed md:translate-x-0 fixed md:relative w-72 h-full border-r border-zinc-800 flex flex-col bg-[#0f0f0f]">
+            <div class="p-6 flex items-center gap-3 border-b border-zinc-800">
+                <div class="bg-yellow-600 p-2 rounded text-black font-bold text-xs">📦</div>
+                <h1 class="text-lg font-bold tracking-widest text-white">ORETRACK</h1>
+                <button onclick="toggleMenu()" class="md:hidden ml-auto text-gray-400"><i class="fa-solid fa-xmark text-xl"></i></button>
+            </div>
+            <div id="user-profile" class="px-6 py-6"></div>
+            <nav id="main-nav" class="flex-1 px-4 space-y-1"></nav>
+            <div class="p-6 border-t border-zinc-800"><a href="#" class="flex items-center gap-3 text-sm text-zinc-500 hover:text-white transition-all"><i class="fa-solid fa-right-from-bracket"></i> Sign Out</a></div>
+        </aside>
+
+        <div class="flex-1 flex flex-col min-w-0 h-full">
+            <header class="md:hidden flex items-center justify-between p-4 border-b border-zinc-800 bg-[#0f0f0f]">
+                <button onclick="toggleMenu()" class="text-zinc-400"><i class="fa-solid fa-bars text-xl"></i></button>
+                <span id="header-title" class="font-bold text-sm tracking-wider text-white uppercase">App</span>
+                <div class="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center text-[10px] font-bold text-white" id="header-avatar">LC</div>
+            </header>
+
+            <main class="flex-1 overflow-y-auto p-4 md:p-10 relative">
+                
+                <div class="fixed top-4 right-4 z-50">
+                    <button onclick="switchUserRole()" class="bg-gradient-to-r from-indigo-600 to-purple-600 text-white text-[10px] md:text-xs font-bold py-2 px-4 rounded-full shadow-2xl border border-indigo-400 animate-pulse-glow transition-all flex items-center justify-center gap-2 hover:scale-105 active:scale-95 whitespace-nowrap">
+                        <i class="fa-solid fa-shuffle"></i> 
+                        <span id="role-text">Switch User Role</span>
+                    </button>
+                </div>
+
+                <!-- OVERVIEW PAGE -->
+                <section id="page-overview" class="page-section hidden">
+                    <h2 class="text-2xl font-bold mb-8">OVERVIEW</h2>
+                    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+                        <div class="card p-5 rounded-xl"><p class="text-[10px] text-zinc-500 uppercase font-bold mb-1">Live Offers</p><p class="text-2xl font-bold text-yellow-500" id="stat-live">0</p></div>
+                        <div class="card p-5 rounded-xl"><p class="text-[10px] text-zinc-500 uppercase font-bold mb-1">Confirmed</p><p class="text-2xl font-bold text-green-500" id="stat-conf">0</p></div>
+                        <div class="card p-5 rounded-xl"><p class="text-[10px] text-zinc-500 uppercase font-bold mb-1">Total Tons</p><p class="text-2xl font-bold text-white" id="stat-tons">0</p></div>
+                        <div class="card p-5 rounded-xl"><p class="text-[10px] text-zinc-500 uppercase font-bold mb-1">Total Dispatches</p><p class="text-2xl font-bold text-yellow-500" id="stat-total-disp">0</p></div>
+                    </div>
+                    <div class="card p-6 rounded-xl mb-8"><h3 class="text-sm font-bold mb-6 uppercase tracking-widest text-zinc-400">Recent Activity</h3><div id="recent-list" class="space-y-3"></div></div>
+                </section>
+
+                <!-- CREATE DISPATCH PAGE -->
+                <section id="page-create" class="page-section hidden">
+                    <h2 class="text-2xl font-bold mb-10">CREATE DISPATCH</h2>
+                    <div class="step-container mb-16">
+                        <div class="step-line-bg"></div><div id="progress-line" class="step-line-progress" style="width: 0%;"></div>
+                        <div class="step-node"><div id="s1" class="step-circle bg-zinc-800 text-zinc-500">1</div><span class="text-[10px] font-bold uppercase text-zinc-500">Ore Details</span></div>
+                        <div class="step-node"><div id="s2" class="step-circle bg-zinc-800 text-zinc-500">2</div><span class="text-[10px] font-bold uppercase text-zinc-500">Assignment</span></div>
+                        <div class="step-node"><div id="s3" class="step-circle bg-zinc-800 text-zinc-500">3</div><span class="text-[10px] font-bold uppercase text-zinc-500">Review</span></div>
+                    </div>
+                    <div class="max-w-xl mx-auto card p-6 md:p-10 rounded-3xl">
+                        <div id="wizard-1">
+                            <h3 class="text-xs font-bold text-zinc-500 mb-6 uppercase tracking-widest">Step 1 · Ore Details</h3>
+                            <div class="bg-zinc-900/50 p-4 rounded-xl mb-6 border border-zinc-800">
+                                <div class="flex items-center gap-3 mb-2"><div class="bg-yellow-900/20 p-2 rounded text-yellow-500"><i class="fa-solid fa-box"></i></div><p class="text-[10px] text-zinc-500 uppercase">Mining Site *</p></div>
+                                <select id="f-mining-site" onchange="onMiningSiteChange()" class="input-field w-full p-2.5 rounded-lg text-sm required">
+                                    <option value="">Select mining site</option>
+                                    <option value="NMDC C-Block">NMDC C-Block</option>
+                                    <option value="Dhoni Mane Mining">Dhoni Mane Mining</option>
+                                    <option value="SKME Mining">SKME Mining</option>
+                                    <option value="VESCO Mining">VESCO Mining</option>
+                                    <option value="Nandi Iron Mining">Nandi Iron Mining</option>
+                                    <option value="Rama Mining">Rama Mining</option>
+                                    <option value="Dharma Mining">Dharma Mining</option>
+                                    <option value="OLD ZTC">OLD ZTC</option>
+                                    <option value="BKG">BKG</option>
+                                </select>
+                            </div>
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+                              <div><label class="text-[10px] text-zinc-500 mb-1 block uppercase font-bold">Ore Type *</label><select id="f-type" class="input-field w-full p-2.5 rounded-lg text-sm required"><option value="">Select ore type</option><option value="Iron Ore (Fines)">Iron Ore (Fines)</option><option value="Iron Ore (Lumps)">Iron Ore (Lumps)</option><option value="Iron Ore (Calibrated)">Iron Ore (Calibrated)</option><option value="Manganese">Manganese</option><option value="Chrome Ore">Chrome Ore</option><option value="Bauxite">Bauxite</option><option value="Limestone">Limestone</option><option value="Coal">Coal</option></select></div>
+                                <div>
+                                    <label class="text-[10px] text-zinc-500 mb-1 block uppercase font-bold">Lorry Type *</label>
+                                    <select id="f-lorry-type" onchange="calculateLorries()" class="input-field w-full p-2.5 rounded-lg text-sm required">
+                                        <option value="">Select lorry type</option>
+                                        <option value="Civil Lorry">Civil Lorry</option>
+                                        <option value="Tipper Lorry">Tipper Lorry</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="mb-4"><label class="text-[10px] text-zinc-500 mb-1 block uppercase font-bold">Quantity (Tons) *</label><div class="relative"><input type="number" id="f-qty" oninput="calculateLorries()" placeholder="e.g. 400" class="input-field w-full p-2.5 rounded-lg text-sm required"><span class="absolute right-3 top-2.5 text-zinc-600 text-xs font-bold">T</span></div></div>
+                           <div class="mb-4"><label class="text-[10px] text-zinc-500 mb-1 block uppercase font-bold">Loading Point *</label><input type="text" id="f-slot" readonly placeholder="Auto-filled after mining site is confirmed" class="input-field w-full p-2.5 rounded-lg text-sm required bg-zinc-900/60 cursor-not-allowed"></div>
+                           <div id="loading-point-container" class="mb-8 hidden">
+                               <label class="text-[10px] text-zinc-500 mb-1 block uppercase font-bold">Loading Point Number *</label>
+                               <select id="f-loading-point" class="input-field w-full p-2.5 rounded-lg text-sm">
+                                   <option value="">Select loading point</option>
+                                   <option value="Loading Point 1">Loading Point 1</option>
+                                   <option value="Loading Point 2">Loading Point 2</option>
+                                   <option value="Loading Point 3">Loading Point 3</option>
+                                   <option value="Loading Point 4">Loading Point 4</option>
+                               </select>
+                           </div>
+                            <button onclick="validateAndGo(1, 2)" class="w-full btn-gold py-3 rounded-lg text-sm flex items-center justify-center gap-2">Next: Assignment <i class="fa-solid fa-chevron-right text-xs"></i></button>
+                        </div>
+                        <div id="wizard-2" class="hidden">
+                            <h3 class="text-xs font-bold text-zinc-500 mb-6 uppercase tracking-widest">Step 2 · Assignment & Schedule</h3>
+                            <div class="mb-4"><label class="text-[10px] text-zinc-500 mb-1 block uppercase font-bold">Destination *</label><select id="f-dest" class="input-field w-full p-2.5 rounded-lg text-sm required"><option value="">Select destination</option>
+
+<option value="JSW Steel Plant, Toranagallu">JSW Steel Plant, Toranagallu</option>
+<option value="Janaki Steel Plant Bellary">Janaki Steel Plant Bellary</option>
+<option value="Kirloskar Ferrous Ginigera Kopal">Kirloskar Ferrous Ginigera Kopal</option>
+<option value="Ginigera Kopal">Ginigera Kopal</option>
+<option value="JSW Steel Plant,10mt Gate">JSW Steel Plant,10mt Gate</option>
+<option value="JSW Steel Plant, 4mt Gate">JSW Steel Plant, 4mt Gate</option>
+<option value="KEJ Minerals Bannihatti">KEJ Minerals Bannihatti</option>
+<option value="Minara Steels Puduthini">Minara Steels Puduthini</option>
+<option value="Bellary Iron and Steel">Bellary Iron and Steel</option>
+<option value="Thakur Industries Giri Gera">Thakur Industries Giri Gera</option>
+<option value="SLR Hospet">SLR Hospet</option>
+<option value="MSPL Aoppal">MSPL Aoppal</option>
+</select></div>
+                            <div class="mb-4"><label class="text-[10px] text-zinc-500 mb-1 block uppercase font-bold">Expected Delivery Date * (Auto: +1 Day)</label><input type="date" id="f-date" class="input-field w-full p-2.5 rounded-lg text-sm required"></div>
+                            <div class="grid grid-cols-2 gap-4 mb-4">
+                                <div><label class="text-[10px] text-zinc-500 mb-1 block uppercase font-bold">Start Time</label><input type="time" id="f-start" value="06:30" class="input-field w-full p-2.5 rounded-lg text-sm"></div>
+                                <div><label class="text-[10px] text-zinc-500 mb-1 block uppercase font-bold">End Time</label><input type="time" id="f-end" value="18:00"  class="input-field w-full p-2.5 rounded-lg text-sm"></div>
+                            </div>
+                            <div class="mb-8 p-4 bg-yellow-900/20 border border-yellow-700/30 rounded-xl">
+                                <p class="text-zinc-400 text-xs uppercase font-bold mb-1">Estimated Logistics Requirement</p>
+                                <p class="text-lg font-bold text-yellow-500">Total Lorries Required: <span id="display-lorries">0</span></p>
+                            </div>
+                            <div class="mb-8"><label class="text-[10px] text-zinc-500 mb-1 block uppercase font-bold">Special Instructions <span class="text-zinc-600">(Optional)</span></label><textarea id="f-instr" rows="3" class="input-field w-full p-2.5 rounded-lg text-sm"></textarea></div>
+                            <div class="flex gap-3"><button onclick="goStep(1)" class="flex-1 bg-zinc-800 p-3 rounded-lg text-sm font-medium">Back</button><button onclick="validateAndGo(2, 3)" class="flex-1 btn-gold p-3 rounded-lg text-sm font-medium">Review</button></div>
+                        </div>
+                        <div id="wizard-3" class="hidden">
+                            <h3 class="text-xs font-bold text-zinc-500 mb-6 uppercase tracking-widest text-center">STEP 3 · REVIEW & CONFIRM</h3>
+                            <div class="bg-zinc-900/80 p-6 rounded-2xl border border-zinc-800 space-y-6 mb-6">
+                                <div class="flex items-center gap-3 pb-4 border-b border-zinc-800">
+                                    <div class="bg-yellow-600/20 p-2 rounded text-yellow-500"><i class="fa-solid fa-cube"></i></div>
+                                    <div><p id="r-mining-site" class="font-bold text-white text-sm">Ramgarhi Mining</p><p class="text-[10px] text-zinc-500 uppercase">Lease EA2141 • SKMEPL</p></div>
+                                </div>
+                                <div class="grid grid-cols-2 gap-x-8 gap-y-5 text-xs">
+                                    <div><p class="text-zinc-500 uppercase text-[10px] mb-1">Ore Type</p><p id="r-type" class="font-bold text-white"></p></div>
+                                    <div><p class="text-zinc-500 uppercase text-[10px] mb-1">Loading Point</p><p id="r-loading-point" class="font-bold text-white"></p></div>
+                                    <div><p class="text-zinc-500 uppercase text-[10px] mb-1">Quantity</p><p id="r-qty" class="font-bold text-white"></p></div>
+                                    <div><p class="text-zinc-500 uppercase text-[10px] mb-1">Loading Slot</p><p id="r-slot" class="font-bold text-white"></p></div>
+                                    <div><p class="text-zinc-500 uppercase text-[10px] mb-1">Destination</p><p id="r-dest" class="font-bold text-white"></p></div>
+                                    <div><p class="text-zinc-500 uppercase text-[10px] mb-1">Trip Date</p><p id="r-date" class="font-bold text-white"></p></div>
+                                    <div><p class="text-zinc-500 uppercase text-[10px] mb-1">Window</p><p class="font-bold text-white">06:30 - 18:00</p></div>
+                                    <div><p class="text-zinc-500 uppercase text-[10px] mb-1">Lorry Type</p><p id="r-lorry-type" class="font-bold text-white"></p></div>
+                                </div>
+                                <div class="pt-4 border-t border-zinc-800">
+                                    <p class="text-zinc-500 uppercase text-[10px] mb-1">Total Lorries Required</p>
+                                    <p id="r-total-lorries" class="text-lg font-bold text-white"></p>
+                                </div>
+                            </div>
+                            <div class="bg-blue-900/20 border border-blue-900/50 p-4 rounded-xl mb-6 flex items-start gap-3">
+                                <i class="fa-solid fa-circle-info text-blue-400 mt-1 text-xs"></i>
+                                <p class="text-blue-300 text-[11px] leading-relaxed">Confirmation will be instant notification by the Purchaser.</p>
+                            </div>
+                            <div class="flex gap-3"><button onclick="goStep(2)" class="flex-1 bg-zinc-800 p-3 rounded-xl text-sm font-medium hover:bg-zinc-700 transition-all">Edit</button><button onclick="saveDispatch()" class="flex-1 bg-green-600 text-white p-3 rounded-xl text-sm font-bold hover:bg-green-500 transition-all flex items-center justify-center gap-2"><i class="fa-solid fa-bell text-xs"></i> Confirm Dispatch</button></div>
+                        </div>
+                        <div id="wizard-done" class="hidden text-center py-10">
+                            <div class="w-20 h-20 bg-green-500/20 text-green-500 rounded-full flex items-center justify-center mx-auto mb-6 border-2 border-green-500"><i class="fa-solid fa-check text-3xl"></i></div>
+                            <h2 class="text-2xl font-bold text-green-500 mb-2">Dispatch Confirmed!</h2>
+                            <p class="text-zinc-400 text-sm mb-8">Real-time notification sent to all purchasers.<br>15-minute offer window is now live.</p>
+                            <div class="bg-zinc-900/80 border border-zinc-800 p-5 rounded-2xl text-left mb-10 max-w-sm mx-auto">
+                                <div class="flex items-center gap-2 text-yellow-500 text-xs font-bold uppercase mb-3"><i class="fa-solid fa-fire"></i> New Dispatch Available!</div>
+                                <p class="text-xs text-zinc-300 mb-1"><span class="text-zinc-500">Site:</span> <span id="done-site"></span> • <span class="text-zinc-500">Slot:</span> <span id="done-slot"></span></p>
+                                <p class="text-xs text-zinc-300 mb-1"><span class="text-zinc-500">Material:</span> <span id="done-mat"></span></p>
+                                <p class="text-xs text-zinc-300"><span class="text-zinc-500">Delivery:</span> <span id="done-date"></span> at 06:30</p>
+                            </div>
+                            <div class="flex flex-col gap-3 max-w-xs mx-auto">
+                                <button onclick="resetWizard()" class="btn-gold p-4 rounded-xl text-sm font-bold flex items-center justify-center gap-2"><i class="fa-solid fa-plus"></i> Create Another Dispatch</button>
+                                <button onclick="showPage('all-dispatches')" class="bg-transparent border border-zinc-700 text-zinc-300 p-4 rounded-xl text-sm hover:bg-zinc-800 transition-all">View All Dispatches</button>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- ALL DISPATCHES PAGE -->
+                <section id="page-all-dispatches" class="page-section hidden">
+                    <h2 class="text-2xl font-bold mb-8">ALL DISPATCHES</h2>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+                        <div class="card p-6 rounded-2xl text-center"><p class="text-zinc-500 uppercase text-[10px] font-bold mb-1">Live</p><p class="text-3xl font-bold text-yellow-500" id="stat-live-big">0</p></div>
+                        <div class="card p-6 rounded-2xl text-center"><p class="text-zinc-500 uppercase text-[10px] font-bold mb-1">Confirmed</p><p class="text-3xl font-bold text-green-500" id="stat-conf-big">0</p></div>
+                        <div class="card p-6 rounded-2xl text-center"><p class="text-zinc-500 uppercase text-[10px] font-bold mb-1">Total</p><p class="text-3xl font-bold text-white" id="stat-total-big">0</p></div>
+                    </div>
+                    <div id="dispatch-list" class="space-y-4"></div>
+                </section>
+
+                <!-- FLEET STATUS PAGE -->
+                <section id="page-fleet-status" class="page-section hidden">
+                    <h2 class="text-2xl font-bold mb-8">FLEET STATUS</h2>
+                    <div class="card overflow-hidden rounded-xl">
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left text-sm">
+                                <thead class="bg-zinc-900 text-zinc-500 uppercase text-[10px] font-bold">
+                                    <tr><th class="p-4">Owner Name</th><th class="p-4">Total Lorries</th><th class="p-4">Combined Capacity</th><th class="p-4">Current Load</th><th class="p-4">Bonus Rate</th></tr>
+                                </thead>
+                                <tbody id="fleet-status-body" class="divide-y divide-zinc-800"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- LEASES PAGE -->
+                <section id="page-leases" class="page-section hidden">
+                    <div class="flex justify-between items-center mb-4"><h2 class="text-2xl font-bold uppercase tracking-tight">Mining Lease Map · Bellary / Sandur Belt</h2><span class="bg-yellow-600 text-black font-bold px-3 py-1 rounded text-xs">32 Leases</span></div>
+                    <div id="map" class="mb-6"></div>
+                    <div class="mb-6"><div class="relative"><i class="fa-solid fa-magnifying-glass absolute left-4 top-3 text-zinc-600"></i><input type="text" id="lease-search" oninput="filterLeases()" placeholder="Search company or lease number..." class="input-field w-full p-3 pl-12 rounded-xl text-sm"></div></div>
+                    <p class="text-xs text-zinc-500 mb-4" id="lease-count">Showing 32 of 32 registered leases</p>
+                    <div id="lease-list" class="space-y-2 max-h-[400px] overflow-y-auto pr-2"></div>
+                </section>
+
+                <!-- FLASH DISPATCH PAGE -->
+                <section id="page-flash" class="page-section hidden">
+                    <div class="flex justify-between items-center mb-10">
+                        <h2 class="text-2xl font-bold">FLASH DISPATCH</h2>
+                        <div class="w-10 h-10 rounded-full bg-indigo-600 items-center justify-center font-bold text-white flex" id="buyer-avatar">SB</div>
+                    </div>
+                    <div id="offer-card" class="max-w-3xl mx-auto card rounded-3xl overflow-hidden relative border-yellow-900/30">
+                        <div class="bg-zinc-700/60 p-4 border-b border-zinc-700 flex justify-between items-center">
+                            <div class="flex items-center gap-2 text-xs font-bold text-zinc-400 uppercase tracking-widest"><i class="fa-solid fa-bell text-yellow-500"></i> New Dispatch Offer</div>
+                            <span class="text-[10px] bg-green-600 text-white px-2 py-0.5 rounded-full font-bold">LIVE</span>
+                        </div>
+                        <div class="p-6 md:p-10">
+                            <div class="flex flex-col md:flex-row items-center gap-10 mb-10">
+                                <div class="text-center md:text-left relative">
+                                    <p class="text-[10px] text-zinc-500 uppercase font-bold mb-1">Mining Site</p>
+                                    <p id="offer-mining-site" class="text-xl font-bold text-white mb-1">Ramgarhi Mining</p>
+                                    <p class="text-xs text-zinc-400 mb-4">Sri Kumaraswamy Mineral Exports (SKME) Pvt Ltd</p>
+                                    <p class="text-[10px] text-zinc-500 uppercase font-bold mb-1">Material</p>
+                                    <p class="text-lg font-bold text-yellow-500" id="offer-material">Iron Ore</p>
+                                    <p class="text-xs text-zinc-500">Fines 51-55% Fe</p>
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+                                <div class="bg-zinc-900/50 p-4 rounded-2xl border border-zinc-800">
+                                    <div class="flex items-center gap-2 text-zinc-500 text-[10px] uppercase font-bold mb-1"><i class="fa-solid fa-location-dot"></i> Delivery Location</div>
+                                    <p class="text-lg font-bold text-white" id="offer-slot">--</p>
+                                    <p class="text-xs text-zinc-500">Selected Destination</p>
+                                </div>
+                                <div class="bg-zinc-900/50 p-4 rounded-2xl border border-zinc-800">
+                                    <div class="flex items-center gap-2 text-zinc-500 text-[10px] uppercase font-bold mb-1"><i class="fa-solid fa-calendar-days"></i> Trip Schedule Date & Time</div>
+                                    <p class="text-lg font-bold text-white" id="offer-date">--</p>
+                                    <p class="text-xs text-zinc-500">Window: 06:30 - 18:00</p>
+                                </div>
+                                <div class="bg-zinc-900/50 p-4 rounded-2xl border border-zinc-800">
+                                    <div class="flex items-center gap-2 text-zinc-500 text-[10px] uppercase font-bold mb-1"><i class="fa-solid fa-weight-hanging"></i> Purchase Quantity</div>
+                                    <p class="text-2xl font-bold text-white" id="offer-qty">0 <span class="text-sm font-normal text-zinc-500">Tons</span></p>
+                                </div>
+                            </div>
+                            <div class="mb-10"><div id="route-map"></div><div class="flex items-center justify-center gap-4 mt-4 text-xs text-zinc-400 font-medium"><span class="flex items-center gap-1"><i class="fa-solid fa-circle text-red-500 text-[8px]"></i> <span id="offer-pickup-label">--</span></span><i class="fa-solid fa-chevron-right text-[10px]"></i><span class="flex items-center gap-1"><i class="fa-solid fa-circle text-green-500 text-[8px]"></i> <span id="offer-drop-label">--</span></span></div></div>
+                            <div class="flex gap-4">
+                                <button onclick="openRejectionModal()" class="flex-1 py-4 rounded-2xl border border-red-900/50 bg-red-900/20 text-red-500 font-bold hover:bg-red-900/40 transition-all flex items-center justify-center gap-2"><i class="fa-solid fa-circle-xmark"></i> Reject</button>
+                                <button onclick="directAccept()" class="flex-1 py-4 rounded-2xl bg-green-600 text-white font-bold hover:bg-green-500 transition-all flex items-center justify-center gap-2"><i class="fa-solid fa-circle-check"></i> Accept</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="no-offer" class="hidden text-center py-20"><i class="fa-solid fa-box-open text-5xl text-zinc-700 mb-4"></i><h3 class="text-xl font-bold text-zinc-400">No Active Offers Available</h3></div>
+                </section>
+
+                <!-- FLEET ALLOCATION PAGE -->
+                <section id="page-fleet-alloc" class="page-section hidden">
+                    <div class="max-w-3xl mx-auto space-y-6">
+                        <div class="bg-green-900/20 border border-green-500/40 p-4 rounded-xl flex items-center gap-3 text-green-400 text-sm font-bold">
+                            <i class="fa-solid fa-circle-check text-lg"></i>
+                            <div>
+                                <p>Dispatch Accepted!</p>
+                                <p class="text-[10px] opacity-70 font-normal">Sourced Order — Now allocate your fleet</p>
+                            </div>
+                        </div>
+                        <div class="card p-6 rounded-2xl">
+                            <div class="flex justify-between items-center mb-4">
+                                <h3 class="text-zinc-500 uppercase text-[10px] font-bold tracking-widest">Trip Summary</h3>
+                                <div class="text-right">
+                                    <p class="text-zinc-500 uppercase text-[9px] font-bold">Booking Status</p>
+                                    <span class="text-green-500 font-bold text-xs uppercase">Allocating...</span>
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-2 md:grid-cols-3 gap-y-6 gap-x-4 text-xs">
+                                <div><p class="text-zinc-600 uppercase text-[9px] mb-1">Material</p><p class="font-bold text-white" id="alloc-material">Iron Ore</p></div>
+                                <div><p class="text-zinc-600 uppercase text-[9px] mb-1">Purchase Quantity</p><p class="font-bold text-white" id="alloc-qty">0 T</p></div>
+                                <div><p class="text-zinc-600 uppercase text-[9px] mb-1">Pick-up</p><p class="font-bold text-white" id="alloc-pickup">Dharmapur</p></div>
+                                <div><p class="text-zinc-600 uppercase text-[9px] mb-1">Drop</p><p class="font-bold text-white" id="alloc-drop">Somalapura</p></div>
+                                <div><p class="text-zinc-600 uppercase text-[9px] mb-1">Date</p><p class="font-bold text-white" id="alloc-date">2026-06-25</p></div>
+                                <div><p class="text-zinc-600 uppercase text-[9px] mb-1">Window</p><p class="font-bold text-white">06:30 - 18:00</p></div>
+                                <div class="col-span-2 bg-yellow-900/10 p-2 rounded-lg border border-yellow-900/30">
+                                    <p class="text-zinc-600 uppercase text-[9px] mb-1">Total Lorries Required (Site Management Requirement)</p>
+                                    <p class="font-bold text-yellow-500 text-sm" id="alloc-site-req">0 Lorries</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="card p-6 rounded-2xl">
+                            <div class="flex justify-between items-center mb-4">
+                                <h3 class="text-zinc-500 uppercase text-[10px] font-bold tracking-widest">Your Owned Fleet</h3>
+                                <button onclick="openAddOwnedLorry()" class="btn-gold text-[11px] font-bold py-2 px-4 rounded-lg flex items-center gap-2"><i class="fa-solid fa-plus text-[10px]"></i> Add Lorry</button>
+                            </div>
+                            <div id="add-owned-lorry-form" class="hidden bg-zinc-900/50 p-4 rounded-xl border border-zinc-800 mb-4 space-y-3">
+                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                    <div><label class="text-[10px] text-zinc-500 mb-1 block uppercase font-bold">Lorry Number *</label><input type="text" id="ol-number" placeholder="e.g. KA-01-F1234" class="input-field w-full p-2.5 rounded-lg text-sm"></div>
+                                    <div><label class="text-[10px] text-zinc-500 mb-1 block uppercase font-bold">License Number *</label><input type="text" id="ol-license" placeholder="e.g. DL-1420110012345" class="input-field w-full p-2.5 rounded-lg text-sm"></div>
+                                    <div><label class="text-[10px] text-zinc-500 mb-1 block uppercase font-bold">Driver Name *</label><input type="text" id="ol-driver" placeholder="e.g. Ramesh Kumar" class="input-field w-full p-2.5 rounded-lg text-sm"></div>
+                                    <div><label class="text-[10px] text-zinc-500 mb-1 block uppercase font-bold">Phone Number *</label><input type="tel" id="ol-phone" placeholder="e.g. 9876543210" class="input-field w-full p-2.5 rounded-lg text-sm"></div>
+                                </div>
+                                <div class="flex gap-3 pt-1">
+                                    <button onclick="closeAddOwnedLorry()" class="flex-1 bg-zinc-800 p-2.5 rounded-lg text-xs font-bold text-zinc-400">Cancel</button>
+                                    <button onclick="saveOwnedLorry()" class="flex-1 btn-gold p-2.5 rounded-lg text-xs font-bold">Save Lorry</button>
+                                </div>
+                            </div>
+                            <div id="owned-lorry-list" class="space-y-2 mb-4"></div>
+                            <div class="flex items-center justify-between bg-zinc-900/50 p-4 rounded-xl border border-zinc-800">
+                                <div><span class="text-xs text-zinc-400">No. of lorries you own</span><p id="owned-count" class="font-bold text-sm text-white mt-1">0</p></div>
+                                <div class="text-right">
+                                    <p class="text-zinc-600 uppercase text-[9px] mb-1">Owned Capacity</p>
+                                    <p id="owned-capacity" class="text-xl font-bold text-white">0 T</p>
+                                </div>
+                            </div>
+                            <div id="capacity-warning" class="mt-4 p-3 bg-yellow-900/10 border border-yellow-900/40 rounded-xl text-yellow-600 text-xs flex items-center gap-2">
+                                <i class="fa-solid fa-triangle-exclamation"></i> 
+                                <span>Gap: <span id="gap-amount" class="font-bold">0 T</span> · You need additional lorries.</span>
+                            </div>
+                        </div>
+                        <div class="card p-6 rounded-2xl">
+                            <h3 class="text-zinc-500 uppercase text-[10px] font-bold mb-4 tracking-widest">Additional Lorries Required</h3>
+                            <p id="extra-lorry-type-label" class="text-[10px] text-zinc-600 mb-3"></p>
+                            <div id="extra-lorry-options" class="space-y-3"></div>
+                        </div>
+                        <div class="card p-6 rounded-2xl border-yellow-900/30 bg-zinc-900/30">
+                            <div class="grid grid-cols-3 gap-4 text-center">
+                                <div><p class="text-zinc-600 uppercase text-[9px] font-bold mb-1">Total Lorries</p><p id="total-lorries" class="text-xl font-bold text-white">0</p></div>
+                                <div><p class="text-zinc-600 uppercase text-[9px] font-bold mb-1">Total Capacity</p><p id="total-cap" class="text-xl font-bold text-yellow-500">0 T</p></div>
+                                <div><p class="text-zinc-600 uppercase text-[9px] font-bold mb-1">Required</p><p id="total-req" class="text-xl font-bold text-white">0 T</p></div>
+                            </div>
+                            <div id="final-shortage" class="hidden mt-4 text-center text-yellow-500 text-xs font-medium">
+                                <i class="fa-solid fa-circle-info"></i> <span id="final-shortage-text"></span>
+                            </div>
+                        </div>
+                        <div class="flex gap-4 pb-10">
+                            <button onclick="showPage('flash')" class="flex-1 py-4 rounded-xl bg-zinc-800 text-zinc-400 font-bold hover:bg-zinc-700 transition-all">Back</button>
+                            <button id="confirm-trip-btn" onclick="confirmFleetTrip()" class="flex-1 py-4 rounded-xl bg-red-900/30 text-red-500 border border-red-900/50 font-bold opacity-50 cursor-not-allowed transition-all" disabled>Confirm Trip</button>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- ADMIN PANEL PAGE -->
+                <section id="page-admin" class="page-section hidden">
+                    <div class="flex justify-between items-center mb-8">
+                        <h2 class="text-2xl font-bold">ADMIN CONTROL PANEL</h2>
+                        <span class="bg-indigo-600 text-white px-3 py-1 rounded text-xs font-bold">Monitoring Mode</span>
+                    </div>
+                    <div class="card overflow-hidden rounded-xl">
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left text-sm">
+                                <thead class="bg-zinc-900 text-zinc-500 uppercase text-[10px] font-bold">
+                                    <tr><th class="p-4">ID</th><th class="p-4">Mining Site</th><th class="p-4">Tonnage</th><th class="p-4">Material</th><th class="p-4">Current Target</th><th class="p-4">Lorries Short</th><th class="p-4">Status</th><th class="p-4">Action</th></tr>
+                                </thead>
+                                <tbody id="admin-table-body" class="divide-y divide-zinc-800"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+            </main>
+        </div>
+    </div>
+
+    <!-- MODALS -->
+    <div id="rejection-modal" class="modal-overlay hidden flex items-center justify-center p-4">
+        <div class="card max-w-md w-full rounded-3xl p-8">
+            <div class="flex items-center gap-3 mb-6 text-red-500"><i class="fa-solid fa-circle-xmark text-xl"></i><h3 class="text-xl font-bold text-white">Reason for Rejection</h3></div>
+            <div class="space-y-3 mb-8">
+                <label class="flex items-center gap-4 p-4 rounded-xl bg-zinc-900 border border-zinc-800 cursor-pointer transition-all"><input type="radio" name="reject-reason" value="Price" class="radio-custom"><span class="text-sm text-zinc-300">Price Mismatch</span></label>
+                <label class="flex items-center gap-4 p-4 rounded-xl bg-zinc-900 border border-zinc-800 cursor-pointer transition-all"><input type="radio" name="reject-reason" value="Fleet" class="radio-custom"><span class="text-sm text-zinc-300">Insufficient Lorry Availability</span></label>
+                <label class="flex items-center gap-4 p-4 rounded-xl bg-zinc-900 border border-zinc-800 cursor-pointer transition-all"><input type="radio" name="reject-reason" value="Route" class="radio-custom"><span class="text-sm text-zinc-300">Route / Destination Issue</span></label>
+            </div>
+            <div class="flex gap-3"><button onclick="closeL_Modal()" class="flex-1 py-3 rounded-xl bg-zinc-800 text-zinc-400 font-bold">Cancel</button><button id="confirm-reject-btn" onclick="confirmRejection()" class="flex-1 py-3 rounded-xl bg-red-900/30 text-red-500 border border-red-900/50 font-bold opacity-50 cursor-not-allowed" disabled>Confirm Rejection</button></div>
+        </div>
+    </div>
+
+    <div id="admin-detail-modal" class="modal-overlay hidden flex items-center justify-center p-4">
+        <div class="card max-w-4xl w-full rounded-3xl p-6 overflow-y-auto max-h-[90vh]">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-xl font-bold text-white">Detailed Dispatch Logistics</h3>
+                <button onclick="closeDetailModal()" class="text-zinc-500 hover:text-white"><i class="fa-solid fa-xmark text-xl"></i></button>
+            </div>
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div class="space-y-4">
+                    <div class="bg-zinc-900 p-4 rounded-xl border border-zinc-800">
+                        <p class="text-[10px] text-zinc-500 uppercase font-bold mb-2">Consignment Summary</p>
+                        <div class="grid grid-cols-2 gap-x-4 gap-y-3 text-xs">
+                            <div><span class="text-zinc-500">ID:</span> <span id="det-id" class="text-white font-bold ml-1"></span></div>
+                            <div><span class="text-zinc-500">Material:</span> <span id="det-type" class="text-white font-bold ml-1"></span></div>
+                            <div><span class="text-zinc-500">Total Quantity:</span> <span id="det-total" class="text-white font-bold ml-1"></span></div>
+                            <div><span class="text-zinc-500">Lorry Type:</span> <span id="det-lorry-type" class="text-white font-bold ml-1"></span></div>
+                            <div><span class="text-zinc-500">Loading Slot:</span> <span id="det-slot" class="text-white font-bold ml-1"></span></div>
+                            <div><span class="text-zinc-500">Destination:</span> <span id="det-dest" class="text-white font-bold ml-1"></span></div>
+                            <div><span class="text-zinc-500">Trip Date:</span> <span id="det-date" class="text-white font-bold ml-1"></span></div>
+                            <div><span class="text-zinc-500">Status:</span> <span id="det-status" class="text-yellow-500 font-bold ml-1"></span></div>
+                        </div>
+                    </div>
+                    <div class="bg-zinc-900 p-4 rounded-xl border border-zinc-800">
+                        <p class="text-[10px] text-zinc-500 uppercase font-bold mb-3">Driver Log & Verification</p>
+                        <div id="det-allocations" class="space-y-4"></div>
+                    </div>
+                    <div id="shortage-fill-section"></div>
+                </div>
+                <div>
+                    <p class="text-[10px] text-zinc-500 uppercase font-bold mb-3">Live Truck Locations</p>
+                    <div id="admin-detail-map"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="mining-site-modal" class="modal-overlay hidden flex items-center justify-center p-4">
+        <div class="card max-w-md w-full rounded-3xl p-8 text-center">
+            <div class="w-14 h-14 bg-yellow-900/20 text-yellow-500 rounded-full flex items-center justify-center mx-auto mb-5"><i class="fa-solid fa-circle-question text-2xl"></i></div>
+            <h3 class="text-lg font-bold text-white mb-2">Are you sure?</h3>
+            <p class="text-zinc-400 text-sm mb-8">Confirm mining site: <span id="mining-site-confirm-name" class="font-bold text-white"></span></p>
+            <div class="flex gap-3"><button onclick="cancelMiningSite()" class="flex-1 py-3 rounded-xl bg-zinc-800 text-zinc-400 font-bold">Cancel</button><button onclick="confirmMiningSite()" class="flex-1 py-3 rounded-xl btn-gold font-bold">Confirm</button></div>
+        </div>
+    </div>
+
+    <script>
+        // ============================================================
+        // DYNAMIC Lorry Owner HTML with Auto-Population logic
+        // ============================================================
+        const OWNER_PAGE_HTML = `
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Mining Dispatch</title>
+            <style>
+                :root { --primary: #f39c12; --dark: #2c3e50; --bg: #eceff1; --white: #ffffff; --success: #27ae60; }
+                body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: var(--bg); margin: 0; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
+                .app-card { width: 380px; background: var(--white); border-radius: 20px; box-shadow: 0 15px 35px rgba(0,0,0,0.2); overflow: hidden; position: relative; border: 1px solid #ccc; }
+                .header { background-color: var(--dark); color: white; padding: 20px; text-align: center; }
+                .header h2 { margin: 0; font-size: 1.3rem; }
+                .header p { margin: 5px 0 0; font-size: 0.8rem; opacity: 0.7; }
+                .details { padding: 20px; }
+                .row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #eee; }
+                .label { font-size: 0.8rem; color: #777; font-weight: bold; text-transform: uppercase; }
+                .value { font-size: 0.9rem; color: #333; font-weight: 600; text-align: right; }
+                .qr-section { text-align: center; padding: 20px; background: #fdfdfd; border-top: 1px solid #eee; }
+                #qrcode { width: 150px; height: 150px; margin-bottom: 15px; }
+                .btn-scan { background-color: var(--primary); color: white; border: none; padding: 14px 20px; border-radius: 10px; font-size: 1rem; font-weight: bold; cursor: pointer; width: 100%; transition: 0.3s; }
+                .owner-panel { background: #e0e0e0; padding: 15px; text-align: center; border-top: 2px dashed #bbb; }
+                .btn-whatsapp { background-color: #25D366; color: white; border: none; padding: 10px 15px; border-radius: 5px; font-weight: bold; cursor: pointer; text-decoration: none; display: inline-block; font-size: 0.85rem; }
+                .overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(44, 62, 80, 0.92); display: none; flex-direction: column; justify-content: center; align-items: center; z-index: 100; color: white; text-align: center; padding: 20px; box-sizing: border-box; }
+                .popup-box { background: white; color: #333; padding: 25px; border-radius: 15px; width: 85%; box-shadow: 0 10px 25px rgba(0,0,0,0.3); animation: fadeIn 0.5s ease; }
+                @keyframes fadeIn { from { transform: scale(0.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+                .status-icon { font-size: 2rem; margin-bottom: 10px; display: block; }
+                .badge { background: var(--success); color: white; padding: 5px 12px; border-radius: 15px; font-size: 0.75rem; display: inline-block; margin-top: 15px; }
+            </style>
+            </head>
+            <body>
+                <div class="app-card">
+                    <div class="header">
+                        <h2 id="val-header-title">Mining Dispatch</h2>
+                        <p id="val-header-sub">Loading...</p>
+                    </div>
+                    <div class="details">
+                        <div class="row"><span class="label">Mining</span><span class="value" id="val-mining">---</span></div>
+                        <div class="row"><span class="label">Lease Point</span><span class="value">Sri Kumaraswami Mining Export and Pvt Ltd</span></div>
+                        <div class="row"><span class="label">Material</span><span class="value" id="val-material">---</span></div>
+                        <div class="row"><span class="label">Loading Point</span><span class="value" id="val-loading">---</span></div>
+                        <div class="row"><span class="label">Drop Location</span><span class="value" id="val-drop">---</span></div>
+                        <div class="row"><span class="label">Load Quantity</span><span class="value" id="val-qty">---</span></div>
+                        <div class="row"><span class="label">Schedule Date</span><span class="value" id="val-schedule-date">---</span></div>
+                        <div class="row"><span class="label">Schedule Timing</span><span class="value" id="val-schedule-time">---</span></div>
+                        <div class="row" style="border:none;"><span class="label">Lorry Type</span><span class="value" id="val-lorrytype">---</span></div>
+                    </div>
+                    <div class="qr-section">
+                        <img id="qrcode" src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=DemoLink" alt="QR Code">
+                        <button class="btn-scan" onclick="startWorkflow()"> SCAN QR CODE</button>
+                    </div>
+                    <div class="owner-panel">
+                        <p style="font-size: 0.7rem; margin-bottom: 10px; color: #666;">OWNER CONTROL PANEL</p>
+                        <a href="#" id="waLink" class="btn-whatsapp" target="_blank">Send Details to Driver via WhatsApp 💬</a>
+                    </div>
+                    <div class="overlay" id="overlay">
+                        <div class="popup-box" id="popup">
+                            <span class="status-icon" id="icon">🚚</span>
+                            <h3 id="title" style="margin: 0 0 10px 0;">Loading...</h3>
+                            <p id="message" style="margin: 0; color: #666; line-height: 1.5;">Please wait</p>
+                            <div id="badge-area"></div>
+                        </div>
+                    </div>
+                </div>
+                <script>
+                    const APP_URL = "https://oretrack-demo.netlify.app"; 
+                    window.onload = function() {
+                        // Bridge data read from localStorage — populated from the same dispatch
+                        // details entered on the site-management "Create Dispatch" screen.
+                        const data = JSON.parse(localStorage.getItem('oretrack_bridge_data') || '{}');
+                        if(data.mining) { document.getElementById('val-mining').innerText = data.mining; document.getElementById('val-header-title').innerText = data.mining; }
+                        if(data.material) { document.getElementById('val-material').innerText = data.material; document.getElementById('val-header-sub').innerText = data.material; }
+                        if(data.loading) document.getElementById('val-loading').innerText = data.loading;
+                        if(data.dropLocation) document.getElementById('val-drop').innerText = data.dropLocation;
+                        if(data.quantity) document.getElementById('val-qty').innerText = data.quantity;
+                        if(data.scheduleDate) document.getElementById('val-schedule-date').innerText = data.scheduleDate;
+                        if(data.scheduleTime) document.getElementById('val-schedule-time').innerText = data.scheduleTime;
+                        if(data.lorryType) document.getElementById('val-lorrytype').innerText = data.lorryType;
+
+                        const waLink = document.getElementById('waLink');
+                        const qrImg = document.getElementById('qrcode');
+                        const message = encodeURIComponent(\`Hello Driver, here is your load assignment. Link: \${APP_URL}\`);
+                        waLink.href = \`https://wa.me/?text=\${message}\`;
+                        qrImg.src = \`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=\${APP_URL}\`;
+                    };
+                    function startWorkflow() {
+                        const overlay = document.getElementById('overlay');
+                        const title = document.getElementById('title');
+                        const message = document.getElementById('message');
+                        const icon = document.getElementById('icon');
+                        const badgeArea = document.getElementById('badge-area');
+                        overlay.style.display = 'flex';
+                        title.innerText = "Gate Entry";
+                        message.innerText = "Lorry entered site, needs loading";
+                        icon.innerText = "🏢";
+                        badgeArea.innerHTML = '<div class="badge">At Site</div>';
+                        setTimeout(() => {
+                            title.innerText = "Dispatch Success";
+                            message.innerText = "In transit to destination.";
+                            icon.innerText = "🛣️";
+                            badgeArea.innerHTML = '<div class="badge" style="background:#3498db">In Transit</div>';
+                            setTimeout(() => {
+                                title.innerText = "Arrival";
+                                message.innerText = "Entering destination site.";
+                                icon.innerText = "📍";
+                                badgeArea.innerHTML = '<div class="badge" style="background:#9b59b6">Arrived</div>';
+                                setTimeout(() => {
+                                    title.innerText = "Unloading";
+                                    message.innerText = "Dumping process started.";
+                                    icon.innerText = "🏗️";
+                                    badgeArea.innerHTML = '<div class="badge" style="background:#e67e22">Dumping</div>';
+                                    setTimeout(() => { alert("Workflow Complete."); overlay.style.display = 'none'; }, 4000);
+                                }, 3000);
+                            }, 4000);
+                        }, 3000);
+                    }
+                <\/script>
+            </body>
+            </html>
+        `;
+
+        // ============================================================
+        // CORE APPLICATION LOGIC
+        // ============================================================
+
+        function openOwnerDetailsTab() {
+            if (db.length === 0) {
+                alert("No dispatch data found. Please create a dispatch first.");
+                return;
+            }
+            const last = db[0]; // Grab the most recent dispatch
+
+            // Construct the "Bridge Data" using exactly what was entered on the
+            // Create Dispatch screen — mining site, material, loading point, drop
+            // location, load quantity, schedule, and lorry type.
+            const bridgeData = {
+                mining: last.miningSite,
+                material: last.type,
+                loading: [last.slot, last.loadingPoint].filter(Boolean).join(' - '),
+                dropLocation: last.dest,
+                quantity: last.totalQty ? `${last.totalQty} T` : '---',
+                schedule: `${last.date} | 06:30 - 18:00`,
+                scheduleDate: last.date,
+                scheduleTime: '06:30 - 18:00',
+                lorryType: last.lorryType
+            };
+
+            localStorage.setItem('oretrack_bridge_data', JSON.stringify(bridgeData));
+
+            const blob = new Blob([OWNER_PAGE_HTML], { type: 'text/html' });
+            const url = URL.createObjectURL(blob);
+            window.open(url, '_blank');
+        }
+
+        const BUYER_QUEUE = ['Appanna', 'Balaji', 'Chandrashekhar', 'Suresh Kumar'];
+        // Lorries available at the pickup location that admin can call in to cover a shortage.
+        const FLEET_POOL = [
+            { number: 'KA-01-A2234', driver: 'Manjunath H', phone: '9945112233', owner: 'Basuraju Transports' },
+            { number: 'KA-01-A5567', driver: 'Sharanappa K', phone: '9945118877', owner: 'Basuraju Transports' },
+            { number: 'KA-02-B1129', driver: 'Prakash Nayak', phone: '9880023344', owner: 'Devaraju Fleet Services' },
+            { number: 'KA-02-B4471', driver: 'Halappa M', phone: '9880099112', owner: 'Devaraju Fleet Services' },
+            { number: 'KA-03-C7783', driver: 'Somashekar R', phone: '9902211456', owner: 'Chandrashekhar Logistics' },
+            { number: 'KA-03-C9012', driver: 'Yallappa S', phone: '9902278901', owner: 'Chandrashekhar Logistics' },
+            { number: 'KA-04-D2245', driver: 'Basavaraj T', phone: '9986612345', owner: 'Balaji Carriers' },
+            { number: 'KA-04-D6689', driver: 'Nagaraj P', phone: '9986677890', owner: 'Balaji Carriers' },
+            { number: 'KA-05-E3321', driver: 'Ravi Kumar B', phone: '9741155667', owner: 'Suresh Kumar Fleet' },
+            { number: 'KA-05-E8890', driver: 'Manjappa G', phone: '9741199001', owner: 'Suresh Kumar Fleet' },
+            { number: 'KA-06-F1123', driver: 'Chandru N', phone: '9538822334', owner: 'Appanna Transports' },
+            { number: 'KA-06-F4456', driver: 'Veeresh L', phone: '9538877009', owner: 'Appanna Transports' }
+        ];
+        const LEASE_DATA = [{ name: "Sri Kumaraswamy Mineral Exports (SKME) Pvt Ltd", id: "EA2141", type: "Iron Ore", status: "active", coords: [15.12, 76.65], isOurMine: true }];
+        for(let i=2; i<=32; i++){ LEASE_DATA.push({ name: `Mining Lease Co ${i}`, id: `EA${2100+i}`, type: i%2==0?"Iron Ore":"Manganese", status: i%3==0?"active":i%3==1?"notified":"inactive", coords: [15.0 + Math.random()*0.3, 76.4 + Math.random()*0.4], isOurMine: false }); }
+
+        let db = JSON.parse(localStorage.getItem('oretrack_final_db')) || [];
+        let mapInstance = null, routeMapInstance = null, detailMapInstance = null, userRole = 'manager'; 
+
+        function toggleMenu() { document.getElementById('sidebar').classList.toggle('sidebar-closed'); document.getElementById('sidebar-overlay').classList.toggle('hidden'); }
+
+        let previousMiningSite = '';
+        function onMiningSiteChange() {
+            const select = document.getElementById('f-mining-site');
+            const selected = select.value;
+            if(!selected) return;
+            document.getElementById('mining-site-confirm-name').innerText = selected;
+            document.getElementById('mining-site-modal').classList.remove('hidden');
+        }
+        // The Loading Point field auto-displays whichever mining site was confirmed,
+        // then reveals the Loading Point Number (1-4) selector for that site.
+        function syncLoadingPointForMine(mineName) {
+            const slotField = document.getElementById('f-slot');
+            const container = document.getElementById('loading-point-container');
+            const pointSelect = document.getElementById('f-loading-point');
+            if(mineName) {
+                slotField.value = mineName;
+                container.classList.remove('hidden');
+                pointSelect.classList.add('required');
+            } else {
+                slotField.value = '';
+                container.classList.add('hidden');
+                pointSelect.classList.remove('required');
+                pointSelect.value = '';
+            }
+        }
+        function confirmMiningSite() {
+            previousMiningSite = document.getElementById('f-mining-site').value;
+            document.getElementById('mining-site-modal').classList.add('hidden');
+            syncLoadingPointForMine(previousMiningSite);
+        }
+        function cancelMiningSite() {
+            document.getElementById('f-mining-site').value = previousMiningSite;
+            document.getElementById('mining-site-modal').classList.add('hidden');
+            syncLoadingPointForMine(previousMiningSite);
+        }
+
+        function refreshBuyerIdentity() {
+            const currentOffer = db.find(d => d.status === 'PENDING_OFFER');
+            const activeBuyerName = currentOffer ? currentOffer.currentBuyer : BUYER_QUEUE[0];
+            if(userRole === 'buyer') {
+                document.getElementById('user-profile').innerHTML = `<span class="bg-green-900/50 text-green-300 text-[10px] px-2 py-1 rounded-full font-bold uppercase border border-green-500/30">Purchaser</span><p class="mt-2 font-semibold text-sm text-white">${activeBuyerName}</p><p class="text-xs text-zinc-500">Somalapura, Ballari</p>`;
+                document.getElementById('header-avatar').innerText = activeBuyerName.split(' ').map(n => n[0]).join('');
+            }
+        }
+
+        const ROLE_LABELS = { manager: 'LC', buyer: 'PURCHASER', admin: 'ADMIN' };
+
+        function switchUserRole() {
+            const roles = ['manager', 'buyer', 'admin'];
+            let nextIdx = (roles.indexOf(userRole) + 1) % roles.length;
+            userRole = roles[nextIdx];
+            document.getElementById('role-text').innerText = `Switch to ${ROLE_LABELS[roles[(nextIdx + 1) % roles.length]]} View`;
+            
+            if(userRole === 'buyer') {
+                refreshBuyerIdentity();
+                document.getElementById('main-nav').innerHTML = `
+                    <a href="#" onclick="showPage('flash')" class="flex items-center justify-between p-3 rounded-lg text-sm transition-all text-white bg-zinc-800/50">
+                        <div class="flex items-center gap-3"><i class="fa-solid fa-bolt w-5 text-yellow-500"></i> Flash Dispatch</div>
+                        <span class="bg-orange-600 text-black text-[9px] px-1.5 py-0.5 rounded-full font-bold">1</span>
+                    </a>
+                    <a href="#" class="flex items-center gap-3 p-3 rounded-lg text-sm transition-all text-zinc-400 hover:text-white hover:bg-zinc-800"><i class="fa-solid fa-truck-ramp-box w-5"></i> My Dispatches</a>
+                    <a href="#" class="flex items-center gap-3 p-3 rounded-lg text-sm transition-all text-zinc-400 hover:text-white hover:bg-zinc-800"><i class="fa-solid fa-clock-rotate-left w-5"></i> History</a>
+                `;
+                showPage('flash');
+            } else if(userRole === 'admin') {
+                refreshAdminMiningAuthority();
+                document.getElementById('header-avatar').innerText = 'AD';
+                // SIDEBAR ORDER: Control Panel, then Lorry Owner Details
+                document.getElementById('main-nav').innerHTML = `
+                    <a href="#" onclick="showPage('admin')" class="flex items-center gap-3 p-3 rounded-lg text-sm transition-all text-white bg-zinc-800/50">
+                        <i class="fa-solid fa-shield-halved w-5"></i> Control Panel
+                    </a>
+                    <a href="#" onclick="openOwnerDetailsTab()" class="flex items-center gap-3 p-3 rounded-lg text-sm transition-all text-zinc-400 hover:text-white hover:bg-zinc-800">
+                        <i class="fa-solid fa-id-card w-5"></i> Lorry Owner Details
+                    </a>
+                `;
+                showPage('admin');
+            } else {
+                document.getElementById('user-profile').innerHTML = `<span class="bg-indigo-900/50 text-indigo-300 text-[10px] px-2 py-1 rounded-full font-bold uppercase border border-indigo-500/30">LC</span><p class="mt-2 font-semibold text-sm text-white">LC</p><p class="text-xs text-zinc-500">Ramgarhi Mining • EA2141</p>`;
+                document.getElementById('header-avatar').innerText = 'LC';
+                document.getElementById('main-nav').innerHTML = `<a href="#" onclick="showPage('overview')" id="nav-overview" class="flex items-center gap-3 p-3 rounded-lg text-sm transition-all text-white bg-zinc-800/50"><i class="fa-solid fa-chart-pie w-5"></i> Overview</a><a href="#" onclick="showPage('create')" id="nav-create" class="flex items-center gap-3 p-3 rounded-lg text-sm transition-all text-zinc-400 hover:text-white hover:bg-zinc-800"><i class="fa-solid fa-plus-circle w-5"></i> Create Dispatch</a><a href="#" onclick="showPage('all-dispatches')" id="nav-all" class="flex items-center gap-3 p-3 rounded-lg text-sm transition-all text-zinc-400 hover:text-white hover:bg-zinc-800"><i class="fa-solid fa-list-check w-5"></i> All Dispatches</a><a href="#" onclick="showPage('fleet-status')" id="nav-fleet" class="flex items-center gap-3 p-3 rounded-lg text-sm transition-all text-zinc-400 hover:text-white hover:bg-zinc-800"><i class="fa-solid fa-truck-front w-5"></i> Fleet Status</a><a href="#" onclick="showPage('leases')" id="nav-leases" class="flex items-center gap-3 p-3 rounded-lg text-sm transition-all text-zinc-400 hover:text-white hover:bg-zinc-800"><i class="fa-solid fa-map-location-dot w-5"></i> Leases</a>`;
+                showPage('overview');
+            }
+        }
+
+        function showPage(id) {
+            document.querySelectorAll('.page-section').forEach(p => p.classList.add('hidden'));
+            document.getElementById('page-' + id).classList.remove('hidden');
+            updateStats(); 
+            if(id === 'overview') renderRecent();
+            if(id === 'all-dispatches') renderDispatchList();
+            if(id === 'leases') initLeaseMap();
+            if(id === 'flash') initFlashOffer();
+            if(id === 'admin') renderAdminPanel();
+            if(id === 'fleet-status') renderFleetStatus();
+            if(window.innerWidth < 768) toggleMenu();
+        }
+
+        function validateAndGo(current, next) {
+            let isValid = true;
+            const inputs = document.getElementById('wizard-' + current).querySelectorAll('.required');
+            inputs.forEach(input => { if(!input.value.trim()) { isValid = false; input.classList.add('field-error'); setTimeout(() => input.classList.remove('field-error'), 400); } });
+            if(isValid) goStep(next);
+        }
+        function goStep(n) {
+            [1, 2, 3, 'done'].forEach(s => document.getElementById('wizard-' + s)?.classList.add('hidden'));
+            document.getElementById('wizard-' + n).classList.remove('hidden');
+            document.getElementById('s1').className = `step-circle ${n >= 1 ? 'bg-yellow-600 text-black' : 'bg-zinc-800 text-zinc-500'}`;
+            document.getElementById('s2').className = `step-circle ${n >= 2 ? 'bg-yellow-600 text-black' : 'bg-zinc-800 text-zinc-500'}`;
+            document.getElementById('s3').className = `step-circle ${n >= 3 ? 'bg-yellow-600 text-black' : 'bg-zinc-800 text-zinc-500'}`;
+            document.getElementById('progress-line').style.width = n === 1 ? '0%' : n === 2 ? '50%' : '100%';
+            if(n === 3) prepareReview();
+        }
+
+        function calculateLorries() {
+            const qty = parseInt(document.getElementById('f-qty').value) || 0;
+            const type = document.getElementById('f-lorry-type').value;
+            let capacity = 0;
+            if(type === 'Tipper Lorry') capacity = 20;
+            else if(type === 'Civil Lorry') capacity = 38;
+            const totalLorries = capacity > 0 ? Math.ceil(qty / capacity) : 0;
+            document.getElementById('display-lorries').innerText = totalLorries.toLocaleString();
+        }
+
+        function prepareReview() {
+            document.getElementById('r-mining-site').innerText = document.getElementById('f-mining-site').value;
+            document.getElementById('r-type').innerText = document.getElementById('f-type').value;
+            document.getElementById('r-loading-point').innerText = document.getElementById('f-loading-point').value;
+            document.getElementById('r-qty').innerText = document.getElementById('f-qty').value + ' T';
+            document.getElementById('r-slot').innerText = document.getElementById('f-slot').value;
+            document.getElementById('r-dest').innerText = document.getElementById('f-dest').value;
+            document.getElementById('r-date').innerText = document.getElementById('f-date').value;
+            document.getElementById('r-lorry-type').innerText = document.getElementById('f-lorry-type').value;
+            document.getElementById('r-total-lorries').innerText = document.getElementById('display-lorries').innerText;
+        }
+
+        function saveDispatch() {
+            const totalQty = parseInt(document.getElementById('f-qty').value);
+            const totalLorriesRequired = parseInt(document.getElementById('display-lorries').innerText);
+            const newDispatch = {
+                id: 'DISP-' + Math.floor(1000 + Math.random() * 9000),
+                miningSite: document.getElementById('f-mining-site').value,
+                type: document.getElementById('f-type').value,
+                totalQty: totalQty,
+                remainingQty: totalQty,
+                dest: document.getElementById('f-dest').value,
+                slot: document.getElementById('f-slot').value,
+                loadingPoint: document.getElementById('f-loading-point').value,
+                lorryType: document.getElementById('f-lorry-type').value,
+                status: 'PENDING_OFFER', 
+                date: document.getElementById('f-date').value,
+                timestamp: Date.now(),
+                currentBuyerIndex: 0,
+                currentBuyer: BUYER_QUEUE[0],
+                totalLorriesRequired: totalLorriesRequired,
+                allocations: [] 
+            };
+            db.unshift(newDispatch);
+            localStorage.setItem('oretrack_final_db', JSON.stringify(db));
+            updateStats();
+            document.getElementById('done-site').innerText = newDispatch.miningSite;
+            document.getElementById('done-slot').innerText = document.getElementById('f-slot').value;
+            document.getElementById('done-mat').innerText = `${totalQty} T ${document.getElementById('f-type').value}`;
+            document.getElementById('done-date').innerText = newDispatch.date;
+            goStep('done');
+        }
+
+        function resetWizard() { document.querySelectorAll('.input-field').forEach(i => i.value = ''); document.getElementById('display-lorries').innerText = '0'; document.getElementById('loading-point-container').classList.add('hidden'); document.getElementById('f-loading-point').classList.remove('required'); goStep(1); }
+
+        function initFlashOffer() {
+            const offer = db.find(d => d.status === 'PENDING_OFFER');
+            const card = document.getElementById('offer-card');
+            const noOffer = document.getElementById('no-offer');
+            if(!offer) { card.classList.add('hidden'); noOffer.classList.remove('hidden'); return; }
+            card.classList.remove('hidden'); noOffer.classList.add('hidden');
+            document.getElementById('offer-mining-site').innerText = offer.miningSite || 'Ramgarhi Mining';
+            document.getElementById('offer-material').innerText = offer.type;
+            document.getElementById('offer-qty').innerHTML = `${offer.remainingQty} <span class="text-sm font-normal text-zinc-500">Tons</span>`;
+            document.getElementById('offer-slot').innerText = offer.dest; 
+            document.getElementById('offer-date').innerText = `${offer.date} | 06:30 - 18:00`;
+            document.getElementById('offer-pickup-label').innerText = [offer.slot, offer.loadingPoint].filter(Boolean).join(' - ') || '--';
+            document.getElementById('offer-drop-label').innerText = offer.dest || '--';
+            initRouteMap(offer.dest);
+        }
+
+        function initRouteMap(dest) {
+            if(routeMapInstance) { routeMapInstance.remove(); routeMapInstance = null; }
+            routeMapInstance = L.map('route-map', { zoomControl: false }).setView([15.14, 76.75], 12);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(routeMapInstance);
+            const pickup = [15.10, 76.60], drop = dest.includes('Sandur') ? [15.25, 76.50] : [15.18, 76.85];
+            L.circleMarker(pickup, { color: '#ef4444', radius: 6, fillOpacity: 1 }).addTo(routeMapInstance);
+            L.circleMarker(drop, { color: '#22c55e', radius: 6, fillOpacity: 1 }).addTo(routeMapInstance);
+            L.polyline([pickup, drop], { color: '#d4a017', weight: 4, dashArray: '5, 10' }).addTo(routeMapInstance);
+            L.marker([(pickup[0]+drop[0])/2, (pickup[1]+drop[1])/2], { icon: L.divIcon({ className: 'map-dist-label', html: '~12 km', iconSize: [40, 20] }) }).addTo(routeMapInstance);
+            routeMapInstance.fitBounds([pickup, drop], { padding: [30, 30] });
+        }
+
+        function directAccept() {
+            const offer = db.find(d => d.status === 'PENDING_OFFER');
+            if(!offer) return;
+            const amount = offer.remainingQty; 
+            offer.remainingQty -= amount;
+            if(offer.remainingQty > 0) {
+                offer.currentBuyerIndex++;
+                if(offer.currentBuyerIndex < BUYER_QUEUE.length) {
+                    offer.currentBuyer = BUYER_QUEUE[offer.currentBuyerIndex];
+                    offer.timestamp = Date.now();
+                } else { offer.status = 'PARTIALLY_Sourced'; }
+            } else { offer.status = 'CONFIRMED'; }
+            localStorage.setItem('oretrack_final_db', JSON.stringify(db));
+            showPage('fleet-alloc');
+            initFleetAllocation(amount, offer);
+        }
+
+        function openRejectionModal() { document.getElementById('rejection-modal').classList.remove('hidden'); }
+        document.querySelectorAll('input[name="reject-reason"]').forEach(radio => {
+            radio.addEventListener('change', () => {
+                const btn = document.getElementById('confirm-reject-btn');
+                btn.disabled = false; btn.classList.remove('opacity-50', 'cursor-not-allowed'); btn.classList.add('bg-red-600', 'text-white');
+            });
+        });
+        function confirmRejection() {
+            const offer = db.find(d => d.status === 'PENDING_OFFER');
+            if(offer) {
+                offer.currentBuyerIndex++;
+                if(offer.currentBuyerIndex < BUYER_QUEUE.length) {
+                    offer.currentBuyer = BUYER_QUEUE[offer.currentBuyerIndex];
+                    offer.timestamp = Date.now();
+                } else { offer.status = 'FAILED'; }
+                localStorage.setItem('oretrack_final_db', JSON.stringify(db));
+            }
+            closeL_Modal();
+            refreshBuyerIdentity(); 
+            initFlashOffer();
+        }
+        function closeL_Modal() { document.getElementById('rejection-modal').classList.add('hidden'); }
+
+        let ownedLorries = [];
+        let extraAllocation = { }; 
+        let activeLorryTypeSet = 'Tipper Lorry';
+        const CAP = { '6': 20, '10': 30, '12': 38, '14': 46, 'owned': 25 };
+        const LORRY_TYPE_SETS = {
+            'Tipper Lorry': ['6', '10', '12'],
+            'Civil Lorry': ['10', '12', '14']
+        };
+
+        function openAddOwnedLorry() { document.getElementById('add-owned-lorry-form').classList.remove('hidden'); }
+        function closeAddOwnedLorry() {
+            document.getElementById('add-owned-lorry-form').classList.add('hidden');
+            ['ol-number','ol-license','ol-driver','ol-phone'].forEach(id => document.getElementById(id).value = '');
+        }
+        function saveOwnedLorry() {
+            const number = document.getElementById('ol-number').value.trim();
+            const license = document.getElementById('ol-license').value.trim();
+            const driver = document.getElementById('ol-driver').value.trim();
+            const phone = document.getElementById('ol-phone').value.trim();
+            if(!number || !license || !driver || !phone) { alert('Please fill in lorry number, license number, driver name and phone number.'); return; }
+            ownedLorries.push({ number, license, driver, phone });
+            closeAddOwnedLorry();
+            renderOwnedLorryList();
+            calculateFleet();
+        }
+        function removeOwnedLorry(idx) {
+            ownedLorries.splice(idx, 1);
+            renderOwnedLorryList();
+            calculateFleet();
+        }
+        function renderOwnedLorryList() {
+            const listEl = document.getElementById('owned-lorry-list');
+            if(ownedLorries.length === 0) { listEl.innerHTML = ''; return; }
+            listEl.innerHTML = ownedLorries.map((l, idx) => `
+                <div class="flex items-center justify-between p-3 bg-zinc-900/50 rounded-xl border border-zinc-800">
+                    <div class="text-xs">
+                        <p class="font-bold text-white">${l.number} <span class="text-zinc-500 font-normal">· ${l.license}</span></p>
+                        <p class="text-zinc-500">${l.driver} · ${l.phone}</p>
+                    </div>
+                    <button onclick="removeOwnedLorry(${idx})" class="text-zinc-500 hover:text-red-500 text-xs"><i class="fa-solid fa-trash"></i></button>
+                </div>`).join('');
+        }
+
+        function renderExtraLorryOptions() {
+            const wheelKeys = LORRY_TYPE_SETS[activeLorryTypeSet] || LORRY_TYPE_SETS['Tipper Lorry'];
+            const icons = { '6': '🚚', '10': '🚛', '12': '🚚', '14': '🚛' };
+            document.getElementById('extra-lorry-type-label').innerText = `Options for ${activeLorryTypeSet}`;
+            extraAllocation = {};
+            wheelKeys.forEach(k => extraAllocation[k] = 0);
+            document.getElementById('extra-lorry-options').innerHTML = wheelKeys.map(k => `
+                <div class="flex items-center justify-between p-4 bg-zinc-900/50 rounded-xl border border-zinc-800">
+                    <div class="flex items-center gap-4">
+                        <div class="w-10 h-10 rounded bg-black flex items-center justify-center border border-zinc-800 text-xs">${icons[k]}</div>
+                        <div><p class="text-sm font-bold text-white">${k}-Wheel Lorry</p><p class="text-[10px] text-zinc-500">${CAP[k]} T / lorry</p></div>
+                    </div>
+                    <div class="flex items-center gap-3 bg-black p-1 rounded-lg border border-zinc-800">
+                        <button onclick="addLorry('${k}', -1)" class="w-7 h-7 rounded bg-zinc-800 text-zinc-400">-</button>
+                        <span id="cnt-${k}" class="w-4 text-center text-xs font-bold">0</span>
+                        <button onclick="addLorry('${k}', 1)" class="w-7 h-7 rounded bg-zinc-800 text-zinc-400">+</button>
+                    </div>
+                </div>`).join('');
+        }
+
+        function initFleetAllocation(committedQty, offer) {
+            document.getElementById('alloc-material').innerText = offer.type;
+            document.getElementById('alloc-qty').innerText = committedQty + ' T';
+            document.getElementById('alloc-pickup').innerText = [offer.slot, offer.loadingPoint].filter(Boolean).join(' - ') || 'N/A';
+            document.getElementById('alloc-drop').innerText = offer.dest;
+            document.getElementById('alloc-date').innerText = offer.date;
+            document.getElementById('total-req').innerText = committedQty + ' T';
+
+            const totalRequired = offer.totalLorriesRequired || 0;
+            document.getElementById('alloc-site-req').innerText = `${totalRequired} Lorries`;
+
+            ownedLorries = [];
+            renderOwnedLorryList();
+            activeLorryTypeSet = LORRY_TYPE_SETS[offer.lorryType] ? offer.lorryType : 'Tipper Lorry';
+            renderExtraLorryOptions();
+
+            calculateFleet();
+        }
+
+        function addLorry(key, val) {
+            extraAllocation[key] = Math.max(0, (extraAllocation[key] || 0) + val);
+            document.getElementById(`cnt-${key}`).innerText = extraAllocation[key];
+            calculateFleet();
+        }
+        function extraLorryCount() { return Object.values(extraAllocation).reduce((s, v) => s + v, 0); }
+        function extraLorryCapacity() { return Object.keys(extraAllocation).reduce((s, k) => s + extraAllocation[k] * CAP[k], 0); }
+
+        function calculateFleet() {
+            const ownedCap = ownedLorries.length * CAP.owned;
+            const addCap = extraLorryCapacity();
+            const total = ownedCap + addCap;
+            const reqTons = parseInt(document.getElementById('total-req').innerText) || 0;
+            document.getElementById('owned-count').innerText = ownedLorries.length;
+            document.getElementById('owned-capacity').innerText = ownedCap.toFixed(1) + ' T';
+            document.getElementById('total-cap').innerText = total.toFixed(1) + ' T';
+            document.getElementById('total-lorries').innerText = ownedLorries.length + extraLorryCount();
+            const gap = reqTons - total;
+            const warning = document.getElementById('capacity-warning');
+            const finalShortage = document.getElementById('final-shortage');
+            const finalShortageText = document.getElementById('final-shortage-text');
+            const confirmBtn = document.getElementById('confirm-trip-btn');
+            if(gap > 0) {
+                warning.classList.remove('hidden');
+                document.getElementById('gap-amount').innerText = gap.toFixed(1) + ' T';
+                finalShortage.classList.remove('hidden');
+                finalShortageText.innerText = `You can currently deliver ${total.toFixed(1)} T of the ${reqTons} T required — short by ${gap.toFixed(1)} T. You can still confirm with this capacity.`;
+            } else {
+                warning.classList.add('hidden');
+                finalShortage.classList.add('hidden');
+            }
+            const totalLorryCount = ownedLorries.length + extraLorryCount();
+            if(totalLorryCount > 0) {
+                confirmBtn.disabled = false;
+                confirmBtn.className = "flex-1 py-4 rounded-xl bg-yellow-600 text-black font-bold hover:bg-yellow-500 transition-all";
+            } else {
+                confirmBtn.disabled = true;
+                confirmBtn.className = "flex-1 py-4 rounded-xl bg-red-900/30 text-red-500 border border-red-900/50 font-bold opacity-50 cursor-not-allowed transition-all";
+            }
+        }
+
+        function confirmFleetTrip() {
+            const offer = db.find(d => d.status === 'PENDING_OFFER' || d.status === 'PARTIALLY_Sourced');
+            const buyerName = offer ? offer.currentBuyer : 'Unknown';
+
+            const qty = parseFloat(document.getElementById('alloc-qty').innerText.replace(' T', '')) || 0;
+            const reqTons = parseInt(document.getElementById('total-req').innerText) || 0;
+            const deliveredCap = ownedLorries.length * CAP.owned + extraLorryCapacity();
+            const totalLorries = ownedLorries.length + extraLorryCount();
+            const dispatch = db.find(d => d.dest === document.getElementById('alloc-drop').innerText);
+            const lorriesRequired = dispatch ? (dispatch.totalLorriesRequired || 0) : 0;
+            const lorriesShort = Math.max(0, lorriesRequired - totalLorries);
+
+            const trucks = ownedLorries.map(l => ({ id: l.number, driver: l.driver, license: l.license, phone: l.phone, img: 'https://cdn-icons-png.flaticon.com/512/1692/1692167.png', status: 'En Route' }));
+            for(let i=1; i<=extraLorryCount(); i++){
+                trucks.push({ id: `KA-01-F${1000+i}`, img: 'https://cdn-icons-png.flaticon.com/512/1692/1692167.png', status: 'En Route' });
+            }
+            const allocationRecord = {
+                buyer: buyerName,
+                tons: qty,
+                fleet: { owned: ownedLorries.length, ...extraAllocation },
+                ownedLorries: [...ownedLorries],
+                deliveredCapacity: deliveredCap,
+                shortfall: Math.max(0, reqTons - deliveredCap),
+                lorriesRequired: lorriesRequired,
+                lorriesProvided: totalLorries,
+                lorriesShort: lorriesShort,
+                trucks: trucks,
+                location: [15.10 + Math.random()*0.1, 76.60 + Math.random()*0.1]
+            };
+            if(dispatch) {
+                if(!dispatch.allocations) dispatch.allocations = [];
+                dispatch.allocations.push(allocationRecord);
+                dispatch.status = 'CONFIRMED';
+                localStorage.setItem('oretrack_final_db', JSON.stringify(db));
+            }
+            if(lorriesShort > 0) {
+                alert(`Trip confirmed. You're bringing ${totalLorries} of the ${lorriesRequired} lorries required — short by ${lorriesShort}. The mining authority has been notified of this shortage.`);
+            } else {
+                alert("Congratulations, your trip is confirmed.");
+            }
+            refreshBuyerIdentity(); 
+            showPage('flash');
+        }
+
+        function getDispatchLorriesShort(item) {
+            if(!item.allocations || item.allocations.length === 0) return 0;
+            return item.allocations.reduce((s, a) => s + (a.lorriesShort || 0), 0);
+        }
+
+        function renderAdminPanel() {
+            const body = document.getElementById('admin-table-body');
+            body.innerHTML = db.map((item, idx) => {
+                const statusColor = item.status === 'CONFIRMED' ? 'text-green-500' : 'text-zinc-400';
+                const lorriesShort = getDispatchLorriesShort(item);
+                const shortCell = lorriesShort > 0
+                    ? `<span class="bg-red-900/30 text-red-400 px-2 py-1 rounded-full text-[10px] font-bold">${lorriesShort} SHORT</span>`
+                    : `<span class="text-zinc-600 text-[10px]">—</span>`;
+                return `<tr class="hover:bg-zinc-900 cursor-pointer transition-colors" onclick="viewDetails(${idx})"><td class="p-4 font-bold">${item.id}</td><td class="p-4">${item.miningSite || 'N/A'}</td><td class="p-4">${item.totalQty}T</td><td class="p-4">${item.type}</td><td class="p-4">${item.currentBuyer}</td><td class="p-4">${shortCell}</td><td class="p-4 ${statusColor} font-bold text-[10px]">${item.status}</td><td class="p-4"><button onclick="viewDetails(${idx})" class="bg-indigo-600 text-white px-3 py-1 rounded text-[10px] font-bold">Details</button></td></tr>`;
+            }).join('');
+            refreshAdminMiningAuthority();
+        }
+
+        function refreshAdminMiningAuthority() {
+            const el = document.getElementById('user-profile');
+            if(userRole !== 'admin' || !el) return;
+            const shortDispatch = db.find(item => getDispatchLorriesShort(item) > 0);
+            const fallback = db[0];
+            const site = (shortDispatch || fallback || {}).miningSite || 'Ballari';
+            el.innerHTML = `<span class="bg-red-900/50 text-red-300 text-[10px] px-2 py-1 rounded-full font-bold uppercase border border-red-500/30">Administrator</span><p class="mt-2 font-semibold text-sm text-white">Verification Officer</p><p class="text-xs text-zinc-500">Mining Authority - ${site}</p>`;
+        }
+
+        function viewDetails(idx) {
+            const item = db[idx];
+            document.getElementById('det-id').innerText = item.id;
+            document.getElementById('det-type').innerText = item.type;
+            document.getElementById('det-total').innerText = item.totalQty + ' T';
+            document.getElementById('det-lorry-type').innerText = item.lorryType || 'N/A';
+            document.getElementById('det-slot').innerText = item.slot || 'N/A';
+            document.getElementById('det-dest').innerText = item.dest;
+            document.getElementById('det-date').innerText = item.date;
+            document.getElementById('det-status').innerText = item.status;
+
+            const allocDiv = document.getElementById('det-allocations');
+            allocDiv.innerHTML = '';
+
+            if(!item.allocations || item.allocations.length === 0) {
+                allocDiv.innerHTML = `<p class="text-zinc-600 text-xs italic">No driver allocations confirmed yet.</p>`;
+            } else {
+                item.allocations.forEach(alc => {
+                    let truckHtml = '';
+                    if(alc.trucks) {
+                        const perTruckLoad = alc.trucks.length ? (alc.tons / alc.trucks.length).toFixed(1) : alc.tons;
+                        alc.trucks.forEach(t => {
+                            const isConfirmed = item.status === 'CONFIRMED';
+                            const assignedTo = t.driver || t.owner || alc.buyer;
+                            const qrData = `DISPATCH:${item.id}|TRUCK:${t.id}|SITE:${item.miningSite}|DATE:${item.date}|TIME:06:30-18:00|LOAD:${perTruckLoad}T|ASSIGNED:${assignedTo}`;
+                            const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(qrData)}`;
+                            truckHtml += `
+                                <div class="flex flex-col md:flex-row items-center justify-between p-4 bg-zinc-800/50 rounded-xl border border-zinc-700/50 mt-3 gap-4">
+                                    <div class="flex items-center gap-4">
+                                        <img src="${t.img}" class="w-12 h-12 rounded bg-white p-1">
+                                        <div>
+                                            <p class="text-sm font-bold text-white">${t.id} ${t.poolAssigned ? '<span class="text-[8px] bg-indigo-600 text-white px-1.5 py-0.5 rounded-full font-bold uppercase ml-1">Admin-Assigned</span>' : ''}</p>
+                                            <p class="text-[10px] text-zinc-400 uppercase font-bold">${item.lorryType || 'Lorry'}</p>
+                                            ${t.driver ? `<p class="text-[10px] text-zinc-500">${t.driver} · ${t.phone}${t.license ? ` · Lic: ${t.license}` : ''}${t.owner ? ` · Owner: ${t.owner}` : ''}</p>` : ''}
+                                            <span class="text-[9px] text-green-500 font-bold uppercase">${t.status}</span>
+                                        </div>
+                                    </div>
+                                    ${isConfirmed ? `
+                                        <div class="flex flex-col items-center gap-2 bg-black p-2 rounded-lg border border-green-500/30">
+                                            <img src="${qrCodeUrl}" class="w-16 h-16 bg-white p-1 rounded">
+                                            <p class="text-[8px] text-green-400 font-bold text-center">QR VERIFIED</p>
+                                        </div>
+                                    ` : `<div class="text-[10px] text-zinc-500 italic">Waiting for Confirmation...</div>`}
+                                </div>`;
+                        });
+                    }
+
+                    allocDiv.innerHTML += `
+                        <div class="bg-zinc-800 p-4 rounded-xl border border-zinc-700">
+                            <div class="flex justify-between items-center mb-4 border-b border-zinc-700 pb-2">
+                                <span class="text-xs font-bold text-white">Driver/Fleet Allocation: ${alc.buyer}</span>
+                                <span class="text-yellow-500 text-xs font-bold">${alc.tons} T${alc.lorriesShort > 0 ? ` <span class="text-red-400 font-normal">(short ${alc.lorriesShort} lorries)</span>` : ''}</span>
+                            </div>
+                            <p class="text-[10px] text-zinc-400 mb-2 uppercase font-bold">Vehicle Deployment Details</p>
+                            <div class="space-y-2">${truckHtml}</div>
+                        </div>`;
+                });
+            }
+            document.getElementById('admin-detail-modal').classList.remove('hidden');
+            renderShortageFillSection(idx);
+            initDetailMap(item);
+        }
+
+        function closeDetailModal() { document.getElementById('admin-detail-modal').classList.add('hidden'); }
+
+        // ---- Fill a lorry shortage from the pool of available fleet at the pickup location ----
+        function getAvailablePoolLorries() {
+            const assignedNumbers = new Set();
+            db.forEach(d => (d.allocations || []).forEach(a => (a.trucks || []).forEach(t => { if(t.poolAssigned) assignedNumbers.add(t.id); })));
+            return FLEET_POOL.filter(l => !assignedNumbers.has(l.number));
+        }
+
+        function renderShortageFillSection(idx) {
+            const item = db[idx];
+            const shortage = getDispatchLorriesShort(item);
+            const container = document.getElementById('shortage-fill-section');
+            if(shortage <= 0) { container.innerHTML = ''; return; }
+            const available = getAvailablePoolLorries();
+            container.innerHTML = `
+                <div class="bg-zinc-900 p-4 rounded-xl border border-red-900/40 mt-4">
+                    <p class="text-[10px] text-red-400 uppercase font-bold mb-1"><i class="fa-solid fa-triangle-exclamation"></i> Shortage: ${shortage} Lorr${shortage === 1 ? 'y' : 'ies'} — Available Fleet at Pickup Location</p>
+                    <p class="text-[10px] text-zinc-500 mb-3">Select up to ${shortage} lorr${shortage === 1 ? 'y' : 'ies'} to cover this trip, then confirm dispatch.</p>
+                    <div id="pool-lorry-list" class="space-y-2 max-h-56 overflow-y-auto mb-4">
+                        ${available.length === 0 ? `<p class="text-zinc-600 text-xs italic">No available lorries at the pickup location right now.</p>` : available.map((l, i) => `
+                            <label class="flex items-center gap-3 p-3 bg-zinc-800/50 rounded-lg border border-zinc-700 cursor-pointer">
+                                <input type="checkbox" class="pool-lorry-check w-4 h-4" data-idx="${i}" onchange="onPoolCheckChange(${shortage})">
+                                <div class="text-xs">
+                                    <p class="font-bold text-white">${l.number}</p>
+                                    <p class="text-zinc-500">${l.driver} · ${l.phone}</p>
+                                    <p class="text-zinc-600 text-[10px]">Owner: ${l.owner}</p>
+                                </div>
+                            </label>`).join('')}
+                    </div>
+                    <button id="assign-shortage-btn" onclick="assignShortageLorries(${idx})" class="w-full bg-yellow-600 text-black font-bold py-3 rounded-xl text-xs opacity-50 cursor-not-allowed transition-all" disabled>Assign Selected & Confirm Dispatch</button>
+                </div>`;
+        }
+
+        function onPoolCheckChange(maxAllowed) {
+            const checks = Array.from(document.querySelectorAll('.pool-lorry-check'));
+            const checked = checks.filter(c => c.checked);
+            if(checked.length > maxAllowed) {
+                event.target.checked = false;
+                alert(`You can select up to ${maxAllowed} lorr${maxAllowed === 1 ? 'y' : 'ies'} to cover this shortage.`);
+                return;
+            }
+            const btn = document.getElementById('assign-shortage-btn');
+            if(checked.length > 0) {
+                btn.disabled = false;
+                btn.classList.remove('opacity-50', 'cursor-not-allowed');
+            } else {
+                btn.disabled = true;
+                btn.classList.add('opacity-50', 'cursor-not-allowed');
+            }
+        }
+
+        function assignShortageLorries(idx) {
+            const item = db[idx];
+            const available = getAvailablePoolLorries();
+            const checks = Array.from(document.querySelectorAll('.pool-lorry-check'));
+            const selected = checks.filter(c => c.checked).map(c => available[parseInt(c.dataset.idx)]);
+            if(selected.length === 0) return;
+
+            // Target the allocation on this dispatch that's still short.
+            const target = (item.allocations || []).slice().reverse().find(a => (a.lorriesShort || 0) > 0);
+            if(!target) { alert('No allocation on this dispatch is currently short.'); return; }
+
+            selected.forEach(l => {
+                if(!target.trucks) target.trucks = [];
+                target.trucks.push({ id: l.number, driver: l.driver, phone: l.phone, owner: l.owner, poolAssigned: true, img: 'https://cdn-icons-png.flaticon.com/512/1692/1692167.png', status: 'En Route' });
+            });
+
+            const assignedCount = selected.length;
+            target.lorriesShort = Math.max(0, (target.lorriesShort || 0) - assignedCount);
+            target.lorriesProvided = (target.lorriesProvided || 0) + assignedCount;
+
+            localStorage.setItem('oretrack_final_db', JSON.stringify(db));
+
+            // Notify each assigned owner with the same details entered on Create Dispatch.
+            const ownerMsg = selected.map(l =>
+                `To: ${l.owner} — Lorry ${l.number} (Driver: ${l.driver}, ${l.phone})\n` +
+                `Mining Site: ${item.miningSite}\nOre Type: ${item.type}\n` +
+                `Loading Point: ${[item.slot, item.loadingPoint].filter(Boolean).join(' - ') || 'N/A'}\n` +
+                `Destination: ${item.dest}\nSchedule Date: ${item.date}\nSchedule Timing: 06:30 - 18:00`
+            ).join('\n\n---\n\n');
+
+            const remaining = target.lorriesShort;
+            const summary = remaining > 0
+                ? `Assigned ${assignedCount} lorr${assignedCount === 1 ? 'y' : 'ies'} to cover part of the shortage for ${item.id}. Still short by ${remaining} — the remaining lorries will be assigned to the next available trip.`
+                : `Assigned ${assignedCount} lorr${assignedCount === 1 ? 'y' : 'ies'}. The shortage for ${item.id} is now fully covered.`;
+
+            alert(`${summary}\n\nMessage sent to lorry owner(s):\n\n${ownerMsg}`);
+
+            viewDetails(idx);
+            renderAdminPanel();
+        }
+
+        function initDetailMap(item) {
+            if(detailMapInstance) { detailMapInstance.remove(); detailMapInstance = null; }
+            detailMapInstance = L.map('admin-detail-map', { zoomControl: false }).setView([15.13, 76.7], 11);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(detailMapInstance);
+            if(item.allocations) {
+                item.allocations.forEach(alc => {
+                    const count = alc.trucks ? alc.trucks.length : 0;
+                    L.marker(alc.location, { icon: L.divIcon({ className: 'truck-count-label', html: `<span class="truck-count-label">${count}</span>`, iconSize: [20, 20] }) }).addTo(detailMapInstance).bindPopup(`<b>${alc.buyer}</b>: ${count} Trucks`);
+                });
+            }
+        }
+
+        function updateStats() {
+            const live = db.filter(d => d.status === 'PENDING_OFFER').length;
+            const conf = db.filter(d => d.status === 'CONFIRMED').length;
+            document.getElementById('stat-total-disp').innerText = db.length;
+            document.getElementById('stat-live').innerText = live;
+            document.getElementById('stat-conf').innerText = conf;
+            const totalTons = db.reduce((s, d) => s + (parseInt(d.totalQty) || 0), 0);
+            document.getElementById('stat-tons').innerText = totalTons.toLocaleString() + ' Tons';
+            document.getElementById('stat-live-big').innerText = live;
+            document.getElementById('stat-conf-big').innerText = conf;
+            document.getElementById('stat-total-big').innerText = db.length;
+        }
+
+        function renderRecent() {
+            document.getElementById('recent-list').innerHTML = db.slice(0, 3).map(i => `<div class="flex justify-between p-3 bg-zinc-900/50 rounded-lg border border-zinc-800 text-xs"><p class="text-white">${i.id} - ${i.type} (${i.remainingQty}/${i.totalQty} T)</p><span class="text-green-500 font-bold">${i.status}</span></div>`).join('');
+        }
+
+        function renderDispatchList() {
+            const container = document.getElementById('dispatch-list');
+            container.innerHTML = db.map(i => `
+                <div class="card p-5 rounded-2xl flex flex-col md:flex-row justify-between items-center gap-4 transition-all hover:border-zinc-600">
+                    <div class="flex-1 space-y-2 w-full">
+                        <div class="flex justify-between items-center">
+                            <span class="text-yellow-500 text-xs font-bold">${i.id}</span>
+                            <span class="text-[9px] px-2 py-0.5 rounded-full font-bold ${i.status === 'CONFIRMED' ? 'bg-green-900/30 text-green-500' : 'bg-yellow-900/30 text-yellow-500'}">${i.status}</span>
+                        </div>
+                        <p class="text-white font-bold text-sm">${i.type}</p>
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-[11px] text-zinc-400">
+                            <p><span class="text-zinc-600 uppercase text-[9px] block">Quantity</span>${i.totalQty} T</p>
+                            <p><span class="text-zinc-600 uppercase text-[9px] block">Slot</span>${i.slot || 'N/A'}</p>
+                            <p><span class="text-zinc-600 uppercase text-[9px] block">Route</span>${i.dest}</p>
+                            <p><span class="text-zinc-600 uppercase text-[9px] block">Date</span>${i.date}</p>
+                        </div>
+                    </div>
+                    <div class="text-right w-full md:w-auto">
+                        <p class="text-zinc-500 text-[10px] uppercase">Tonnage</p>
+                        <p class="text-lg font-bold text-white">${i.totalQty} T</p>
+                    </div>
+                </div>`).join('');
+        }
+
+        function renderFleetStatus() {
+            const buyers = ['Appanna', 'Balaji', 'Chandrashekhar', 'Suresh Kumar', 'Devaraju', 'Basuraju'];
+            document.getElementById('fleet-status-body').innerHTML = buyers.map(b => `<tr class="border-b border-zinc-900"><td class="p-4">${b}</td><td class="p-4">12</td><td class="p-4">340 T</td><td class="p-4">120 T</td><td class="p-4 text-yellow-500">₹450/T</td></tr>`).join('');
+        }
+
+        function initLeaseMap() {
+            if(mapInstance) return;
+            mapInstance = L.map('map', { zoomControl: false }).setView([15.1394, 76.8877], 11);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(mapInstance);
+            LEASE_DATA.forEach(lease => {
+                let dotColor = lease.status === 'active' ? '#22c55e' : lease.status === 'notified' ? '#eab308' : '#ef4444';
+                let radius = lease.isOurMine ? 10 : 6;
+                L.circleMarker(lease.coords, { color: lease.isOurMine ? '#ff0000' : dotColor, fillColor: lease.isOurMine ? '#ff0000' : dotColor, fillOpacity: 1, radius: radius }).addTo(mapInstance).bindPopup(`<b>${lease.name}</b>`);
+            });
+            renderLeaseList(LEASE_DATA);
+        }
+        function renderLeaseList(data) {
+            document.getElementById('lease-list').innerHTML = data.map(l => `<div class="card p-3 rounded-xl flex justify-between items-center hover:bg-zinc-800 transition-all cursor-pointer"><div><div class="flex items-center gap-2 mb-1">${l.id === 'EA2141' ? '<span class="bg-yellow-600 text-black text-[8px] font-bold px-1 rounded">OUR MINE</span>' : ''}<p class="text-sm font-semibold text-white">${l.name}</p></div><p class="text-[10px] text-zinc-500">Lease: ${l.id}</p></div><span class="text-[9px] px-2 py-1 rounded border border-zinc-700 bg-zinc-900">${l.type}</span></div>`).join('');
+        }
+        function filterLeases() {
+            const q = document.getElementById('lease-search').value.toLowerCase();
+            renderLeaseList(LEASE_DATA.filter(l => l.name.toLowerCase().includes(q) || l.id.toLowerCase().includes(q)));
+        }
+
+        window.onload = () => {
+            const tom = new Date(); tom.setDate(tom.getDate() + 1);
+            document.getElementById('f-date').value = tom.toISOString().split('T')[0];
+            updateStats(); renderRecent(); 
+            userRole = 'manager';
+            document.getElementById('role-text').innerText = 'Switch to PURCHASER View';
+            document.getElementById('user-profile').innerHTML = `<span class="bg-indigo-900/50 text-indigo-300 text-[10px] px-2 py-1 rounded-full font-bold uppercase border border-indigo-500/30">LC</span><p class="mt-2 font-semibold text-sm text-white">LC</p><p class="text-xs text-zinc-500">Ramgarhi Mining • EA2141</p>`;
+            document.getElementById('main-nav').innerHTML = `<a href="#" onclick="showPage('overview')" id="nav-overview" class="flex items-center gap-3 p-3 rounded-lg text-sm transition-all text-white bg-zinc-800/50"><i class="fa-solid fa-chart-pie w-5"></i> Overview</a><a href="#" onclick="showPage('create')" id="nav-create" class="flex items-center gap-3 p-3 rounded-lg text-sm transition-all text-zinc-400 hover:text-white hover:bg-zinc-800"><i class="fa-solid fa-plus-circle w-5"></i> Create Dispatch</a><a href="#" onclick="showPage('all-dispatches')" id="nav-all" class="flex items-center gap-3 p-3 rounded-lg text-sm transition-all text-zinc-400 hover:text-white hover:bg-zinc-800"><i class="fa-solid fa-list-check w-5"></i> All Dispatches</a><a href="#" onclick="showPage('fleet-status')" id="nav-fleet" class="flex items-center gap-3 p-3 rounded-lg text-sm transition-all text-zinc-400 hover:text-white hover:bg-zinc-800"><i class="fa-solid fa-truck-front w-5"></i> Fleet Status</a><a href="#" onclick="showPage('leases')" id="nav-leases" class="flex items-center gap-3 p-3 rounded-lg text-sm transition-all text-zinc-400 hover:text-white hover:bg-zinc-800"><i class="fa-solid fa-map-location-dot w-5"></i> Leases</a>`;
+            showPage('overview');
+        };
+    </script>
+</body>
+</html>
