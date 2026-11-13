@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Indira | Enterprise Logistics - Final Version</title>
+    <title>Indira | Enterprise Logistics - Multi-Role Portal</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     
     <style>
         :root { --bg-dark: #0a0a0a; --bg-card: #141414; --accent-gold: #b88a14; --accent-gold-light: #d4a017; --border-color: #262626; --error-red: #ef4444; }
@@ -16,8 +16,10 @@
         .sidebar { transition: transform 0.3s ease; z-index: 50; }
         .sidebar-closed { transform: translateX(-100%); }
         .card { background-color: var(--bg-card); border: 1px solid var(--border-color); box-shadow: 0 4px 20px rgba(0,0,0,0.6); }
-        .btn-gold { background: linear-gradient(135deg, var(--accent-gold-light), var(--accent-gold)); color: #000; font-weight: 600; }
-        .input-field { background-color: #1a1a1a; border: 1px solid var(--border-color); color: #fff; }
+        .btn-gold { background: linear-gradient(135deg, var(--accent-gold-light), var(--accent-gold)); color: #000; font-weight: 700; transition: all 0.2s ease; }
+        .btn-gold:hover { transform: translateY(-1px); box-shadow: 0 4px 15px rgba(212, 160, 23, 0.3); }
+        .input-field { background-color: #1a1a1a; border: 1px solid var(--border-color); color: #fff; transition: all 0.2s ease; }
+        .input-field:focus { border-color: var(--accent-gold); outline: none; box-shadow: 0 0 0 2px rgba(184, 138, 20, 0.2); }
         .step-container { position: relative; width: 100%; max-width: 800px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; }
         .step-line-bg { position: absolute; top: 16px; left: 0; right: 0; height: 2px; background: #262626; z-index: 1; }
         .step-line-progress { position: absolute; top: 16px; left: 0; height: 2px; background: var(--accent-gold); z-index: 2; transition: width 0.4s ease; }
@@ -36,10 +38,129 @@
         .animate-pulse-glow { animation: pulse-glow 2s infinite; }
         .field-error { border-color: var(--error-red) !important; animation: shake 0.3s; }
         @keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
+        .tab-btn.active { background-color: #262626; color: #d4a017; border-bottom: 2px solid #d4a017; }
+        .role-selector-btn.active { background-color: #b88a14; color: #000; border-color: #b88a14; font-weight: 800; }
     </style>
 </head>
 <body class="antialiased">
- 
+
+    <!-- ============================================================ -->
+    <!-- UNIFIED MULTI-ROLE AUTHENTICATION GATEWAY MODAL -->
+    <!-- Supports: 1. Lessy  2. Purchaser  3. Lorry Owner  4. Admin    -->
+    <!-- ============================================================ -->
+    <div id="unified-login-overlay" class="fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-black/95 backdrop-blur-md overflow-y-auto">
+        <div class="absolute -top-32 -left-32 w-96 h-96 bg-yellow-600/10 rounded-full blur-3xl pointer-events-none"></div>
+        <div class="absolute -bottom-32 -right-32 w-96 h-96 bg-indigo-600/10 rounded-full blur-3xl pointer-events-none"></div>
+
+        <div class="card max-w-lg w-full rounded-3xl p-6 md:p-8 relative z-10 border border-zinc-800 shadow-2xl my-8">
+            
+            <!-- BRAND HEADER -->
+            <div class="text-center mb-6">
+                <div class="w-12 h-12 bg-yellow-600/20 text-yellow-500 rounded-2xl flex items-center justify-center mx-auto mb-2 border border-yellow-600/30 text-2xl shadow-lg">
+                    📦
+                </div>
+                <h1 class="text-xl font-black tracking-widest text-white uppercase">Indira Logistics Portal</h1>
+                <p class="text-[11px] text-zinc-500 font-bold uppercase tracking-wider mt-0.5">Unified Enterprise Authentication Gateway</p>
+            </div>
+
+            <!-- ROLE SELECTOR TABS (4 ROLES) -->
+            <div class="mb-5">
+                <label class="text-[10px] text-zinc-400 mb-1.5 block uppercase font-bold tracking-wider">Select Portal Access Role *</label>
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-1.5 p-1.5 bg-zinc-900 rounded-2xl border border-zinc-800 text-[11px] font-bold">
+                    <button type="button" onclick="setAuthRole('manager')" id="role-btn-manager" class="role-selector-btn active py-2 rounded-xl border border-transparent transition-all flex flex-col items-center gap-1">
+                        <i class="fa-solid fa-mountain text-xs"></i> <span>Lessy</span>
+                    </button>
+                    <button type="button" onclick="setAuthRole('buyer')" id="role-btn-buyer" class="role-selector-btn py-2 rounded-xl text-zinc-400 border border-transparent hover:text-white transition-all flex flex-col items-center gap-1">
+                        <i class="fa-solid fa-cart-shopping text-xs"></i> <span>Purchaser</span>
+                    </button>
+                    <button type="button" onclick="setAuthRole('owner')" id="role-btn-owner" class="role-selector-btn py-2 rounded-xl text-zinc-400 border border-transparent hover:text-white transition-all flex flex-col items-center gap-1">
+                        <i class="fa-solid fa-truck-moving text-xs"></i> <span>Lorry Owner</span>
+                    </button>
+                    <button type="button" onclick="setAuthRole('admin')" id="role-btn-admin" class="role-selector-btn py-2 rounded-xl text-zinc-400 border border-transparent hover:text-white transition-all flex flex-col items-center gap-1">
+                        <i class="fa-solid fa-shield-halved text-xs"></i> <span>Admin</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- DYNAMIC IDENTITY CONTEXT CARD (Changes per role) -->
+            <div id="auth-context-card" class="mb-5 p-4 rounded-2xl border transition-all">
+                <!-- Injected via JavaScript updateAuthContextCard() -->
+            </div>
+
+            <!-- AUTH METHOD TABS: MOBILE OTP VS GMAIL / ID -->
+            <div class="mb-5">
+                <div class="flex rounded-xl bg-zinc-900 p-1 border border-zinc-800">
+                    <button type="button" onclick="switchLoginMethod('otp')" id="method-btn-otp" class="tab-btn active flex-1 py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-mobile-screen"></i> Mobile OTP
+                    </button>
+                    <button type="button" onclick="switchLoginMethod('email')" id="method-btn-email" class="tab-btn flex-1 py-2 rounded-lg text-xs font-bold transition-all text-zinc-400 flex items-center justify-center gap-2">
+                        <i class="fa-brands fa-google"></i> Gmail / ID Login
+                    </button>
+                </div>
+            </div>
+
+            <!-- METHOD A: MOBILE OTP FORM -->
+            <div id="auth-form-otp">
+                <div class="mb-4">
+                    <label class="text-[10px] text-zinc-400 mb-1 block uppercase font-bold" id="auth-phone-label">Authorized Mobile Number *</label>
+                    <div class="flex gap-2">
+                        <span class="p-3 bg-zinc-900 border border-zinc-800 rounded-xl text-xs font-bold text-zinc-400 flex items-center">+91</span>
+                        <input type="tel" id="auth-phone-input" maxlength="10" placeholder="Enter 10-digit mobile" class="input-field flex-1 p-3 rounded-xl text-xs font-semibold">
+                        <button type="button" onclick="sendAuthOTP()" id="btn-send-auth-otp" class="px-3.5 bg-zinc-800 hover:bg-zinc-700 text-yellow-500 rounded-xl text-xs font-bold border border-zinc-700 whitespace-nowrap transition-all">
+                            Send OTP
+                        </button>
+                    </div>
+                    <p id="auth-timer-text" class="text-[10px] text-zinc-500 mt-1 hidden"></p>
+                </div>
+
+                <!-- 6-DIGIT OTP BOX -->
+                <div id="auth-otp-box" class="mb-5 hidden">
+                    <div class="flex justify-between items-center mb-1">
+                        <label class="text-[10px] text-zinc-400 uppercase font-bold">Enter 6-Digit Verification OTP *</label>
+                        <span id="auth-demo-otp-hint" class="text-[10px] text-green-400 font-bold bg-green-950/40 px-2 py-0.5 rounded border border-green-600/30"></span>
+                    </div>
+                    <input type="text" id="auth-otp-input" maxlength="6" placeholder="• • • • • •" class="input-field w-full p-3.5 rounded-xl text-center text-lg font-mono tracking-widest font-black text-yellow-400">
+                </div>
+
+                <button type="button" onclick="executeLogin('OTP')" class="btn-gold w-full py-3.5 rounded-xl text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg">
+                    <i class="fa-solid fa-lock-open"></i> <span id="auth-submit-text-otp">Verify OTP & Log In</span>
+                </button>
+            </div>
+
+            <!-- METHOD B: GMAIL / USER CREDENTIALS FORM -->
+            <div id="auth-form-email" class="hidden space-y-4">
+                <div>
+                    <label class="text-[10px] text-zinc-400 mb-1 block uppercase font-bold" id="auth-email-label">Authorized Account Email *</label>
+                    <div class="relative">
+                        <i class="fa-solid fa-envelope absolute left-3.5 top-3.5 text-zinc-500 text-xs"></i>
+                        <input type="email" id="auth-email-input" placeholder="user@gmail.com" class="input-field w-full p-3 pl-10 rounded-xl text-xs font-semibold">
+                    </div>
+                </div>
+                <div>
+                    <label class="text-[10px] text-zinc-400 mb-1 block uppercase font-bold">Password *</label>
+                    <div class="relative">
+                        <i class="fa-solid fa-key absolute left-3.5 top-3.5 text-zinc-500 text-xs"></i>
+                        <input type="password" id="auth-password-input" placeholder="••••••••••••" class="input-field w-full p-3 pl-10 rounded-xl text-xs font-semibold">
+                    </div>
+                </div>
+
+                <button type="button" onclick="executeLogin('EMAIL')" class="btn-gold w-full py-3.5 rounded-xl text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg">
+                    <i class="fa-brands fa-google text-sm"></i> <span id="auth-submit-text-email">Sign In with Credentials</span>
+                </button>
+            </div>
+
+            <div class="mt-5 pt-4 border-t border-zinc-900 text-center">
+                <p class="text-[10px] text-zinc-500" id="auth-footer-notice">
+                    <i class="fa-solid fa-shield-halved text-yellow-600 mr-1"></i> Authenticated access logged under Government of Karnataka mining regulations.
+                </p>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- MAIN APPLICATION PORTAL -->
+    <!-- ============================================================ -->
     <div id="sidebar-overlay" onclick="toggleMenu()" class="fixed inset-0 bg-black/70 z-40 hidden md:hidden"></div>
  
     <div class="flex h-screen relative">
@@ -51,7 +172,11 @@
             </div>
             <div id="user-profile" class="px-6 py-6"></div>
             <nav id="main-nav" class="flex-1 px-4 space-y-1"></nav>
-            <div class="p-6 border-t border-zinc-800"><a href="#" class="flex items-center gap-3 text-sm text-zinc-500 hover:text-white transition-all"><i class="fa-solid fa-right-from-bracket"></i> Sign Out</a></div>
+            <div class="p-6 border-t border-zinc-800">
+                <a href="#" onclick="portalSignOut()" class="flex items-center gap-3 text-sm text-zinc-500 hover:text-red-400 transition-all font-semibold">
+                    <i class="fa-solid fa-right-from-bracket"></i> Sign Out
+                </a>
+            </div>
         </aside>
  
         <div class="flex-1 flex flex-col min-w-0 h-full">
@@ -64,9 +189,9 @@
             <main class="flex-1 overflow-y-auto p-4 md:p-10 relative">
                 
                 <div class="fixed top-4 right-4 z-50">
-                    <button onclick="switchUserRole()" class="bg-gradient-to-r from-indigo-600 to-purple-600 text-white text-[10px] md:text-xs font-bold py-2 px-4 rounded-full shadow-2xl border border-indigo-400 animate-pulse-glow transition-all flex items-center justify-center gap-2 hover:scale-105 active:scale-95 whitespace-nowrap">
-                        <i class="fa-solid fa-shuffle"></i> 
-                        <span id="role-text">Switch to PURCHASER View</span>
+                    <button onclick="openLoginOverlayForRoleSwitch()" class="bg-gradient-to-r from-indigo-600 to-purple-600 text-white text-[10px] md:text-xs font-bold py-2 px-4 rounded-full shadow-2xl border border-indigo-400 animate-pulse-glow transition-all flex items-center justify-center gap-2 hover:scale-105 active:scale-95 whitespace-nowrap">
+                        <i class="fa-solid fa-user-lock"></i> 
+                        <span id="role-text">Switch Role / Login</span>
                     </button>
                 </div>
  
@@ -103,8 +228,7 @@
                             <div class="bg-zinc-900/50 p-4 rounded-xl mb-6 border border-zinc-800">
                                 <div class="flex items-center gap-3 mb-2"><div class="bg-yellow-900/20 p-2 rounded text-yellow-500"><i class="fa-solid fa-box"></i></div><p class="text-[10px] text-zinc-500 uppercase">Mining Site *</p></div>
                                 <select id="f-mining-site" onchange="onMiningSiteChange()" class="input-field w-full p-2.5 rounded-lg text-sm required">
-                                    <option value="">Select mining site</option>
-                                    <option value="OLD ZTC">OLD ZTC</option>
+                                    <option value="">Select mining site</option>                       
                                     <option value="NMDC C-Block">NMDC C-Block</option>
                                     <option value="Tunga Mining">Tunga Mines</option>
                                     <option value="Bhadra Mining">Bhadra Mines</option>
@@ -118,6 +242,7 @@
                                     <option value="Rama Mining">Rama Mines</option>
                                     <option value="Dharma Mining">Dharma Mines</option>
                                     <option value="BKG">BKG</option>
+                                   <option value="OLD ZTC">OLD ZTC</option>
                                 </select>
                             </div>
                             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
@@ -260,7 +385,7 @@
                     </div>
                 </section>
  
-                <!-- ALL DISPATCHES PAGE (Highlighted Shortage in Lessy View) -->
+                <!-- ALL DISPATCHES PAGE -->
                 <section id="page-all-dispatches" class="page-section hidden">
                     <div class="flex justify-between items-center mb-8">
                         <div>
@@ -292,7 +417,7 @@
                     </div>
                 </section>
 
-                <!-- FLEET STATUS 2 PAGE — Live GPS Tracking & Restored SP Alerts -->
+                <!-- FLEET STATUS 2 PAGE — Live GPS Tracking & SP Alerts -->
                 <section id="page-fleet-status-2" class="page-section hidden">
                     <div class="flex justify-between items-center mb-6">
                         <h2 class="text-2xl font-bold">FLEET STATUS · LIVE GPS TRACKING</h2>
@@ -337,7 +462,7 @@
                             </div>
                         </div>
 
-                        <!-- RESTORED: OVERSPEED DATA & NOTIFY SP SECTION -->
+                        <!-- OVERSPEED DATA & NOTIFY SP SECTION -->
                         <div class="lg:col-span-3 space-y-6">
                             <div class="card p-6 rounded-xl">
                                 <h3 class="text-zinc-500 uppercase text-[10px] font-bold mb-4 tracking-widest">Lorry Information</h3>
@@ -365,7 +490,7 @@
                                 </div>
                             </div>
 
-                            <!-- RESTORED OVERSPEED DATA CARD -->
+                            <!-- OVERSPEED DATA CARD -->
                             <div class="card p-6 rounded-xl border-red-900/40 bg-red-950/20 shadow-xl">
                                 <div class="flex justify-between items-center mb-4">
                                     <h3 class="text-red-500 uppercase text-[10px] font-bold flex items-center gap-2 tracking-wider">
@@ -410,7 +535,7 @@
                             <div class="flex flex-col md:flex-row items-center gap-10 mb-10">
                                 <div class="text-center md:text-left relative">
                                     <p class="text-[10px] text-zinc-500 uppercase font-bold mb-1">Mines Name</p>
-                                    <p id="offer-mining-site" class="text-xl font-bold text-white mb-1">Mining Site</p>
+                                    <p id="offer-mining-site" class="text-xl font-bold text-white mb-1">Ramgarhi Mining (Ramgad)</p>
                                     <p id="offer-loading-point" class="text-xs text-zinc-400 mb-4">--</p>
                                     <p class="text-[10px] text-zinc-500 uppercase font-bold mb-1">Material</p>
                                     <p class="text-lg font-bold text-yellow-500" id="offer-material">Iron Ore</p>
@@ -543,7 +668,7 @@
                         </div>
                     </div>
                 </section>
-
+ 
                 <!-- ADMIN PANEL PAGE -->
                 <section id="page-admin" class="page-section hidden">
                     <div class="flex justify-between items-center mb-8">
@@ -634,7 +759,7 @@
                                     </button>
                                 </div>
 
-                                <!-- LORRY OWNER ALLOCATION FORM: CLEAN NAMES IN DROPDOWN -->
+                                <!-- LORRY OWNER ALLOCATION FORM -->
                                 <div id="owner-dispatch-input-form" class="hidden bg-zinc-900 border border-yellow-600/40 p-5 rounded-2xl space-y-4 my-4">
                                     <div class="flex justify-between items-center pb-2 border-b border-zinc-800">
                                         <p class="text-xs font-bold text-white uppercase"><i class="fa-solid fa-truck-ramp-box text-yellow-500 mr-1.5"></i> Schedule Lorry Commitment</p>
@@ -643,9 +768,9 @@
                                     <div>
                                         <label class="text-[10px] text-zinc-500 mb-1 block uppercase font-bold">Lorry Owner</label>
                                         <select id="owner-select-name" class="input-field w-full p-2.5 rounded-lg text-sm font-semibold">
-                                            <option value="ಬಸವರಾಜು">ಬಸವರಾಜು</option>
-                                            <option value="ಚೇತನ್">ಚೇತನ್</option>
-                                            <option value="ಧನರಾಜ್">ಧನರಾಜ್</option>
+                                            <option value="Basavaraju">Basavaraju</option>
+                                           <option value="Chetan">Chetan</option>
+                                           <option value="Dhanaraj">Dhanaraj</option>
                                         </select>
                                     </div>
                                     <div>
@@ -748,7 +873,7 @@
                             </div>
                             <div class="p-3 bg-amber-950/30 border border-amber-500/30 rounded-xl text-[11px] text-amber-200 leading-relaxed">
                                 <i class="fa-solid fa-circle-info mr-1 text-amber-400"></i>
-                                <b>Status:</b> ಎಲ್ಲಾ 200 ಲಾರಿಗಳು ಈಗಾಗಲೇ ಲೋಡ್ ಆಗಿ ಆಯಾ ಸ್ಥಳಗಳಿಗೆ ಡೆಲಿವರಿ ಮಾಡಲು ತೆರಳಿವೆ. ಪ್ರಸ್ತುತ ಹೊಸ ಟ್ರಿಪ್‌ಗೆ ಲಭ್ಯವಿರುವುದಿಲ್ಲ.
+                                <b>Status:</b> All 200 lorries have already been loaded and have departed to deliver to their respective destinations. They are currently not available for a new trip.
                             </div>
                         </div>
 
@@ -904,22 +1029,24 @@
             <div class="flex gap-3"><button onclick="cancelMiningSite()" class="flex-1 py-3 rounded-xl bg-zinc-800 text-zinc-400 font-bold">Cancel</button><button onclick="confirmMiningSite()" class="flex-1 py-3 rounded-xl btn-gold font-bold">Confirm</button></div>
         </div>
     </div>
+
+    <!-- NOTIFICATION TOAST -->
+    <div id="toast-msg" class="fixed bottom-6 right-6 z-[20000] p-4 rounded-2xl text-xs font-bold shadow-2xl flex items-center gap-3 transform translate-y-20 opacity-0 transition-all duration-300 pointer-events-none"></div>
  
     <script>
-        const BUYER_QUEUE = ['Appanna', 'Balaji', 'Chandrashekhar', 'Suresh Kumar', 'Devaraju', 'Basuraju'];
-        
-        const CAP = {
-            '6': 10,
-            '10': 19,
-            '12': 23,
-            '16': 35,
-            '16-civil': 35
-        };
+        const FIXED_MINE_NAME = "Ramgarhi Mining (Ramgad)";
+        const FIXED_LEASE_CODE = "EA2141";
 
-        const LORRY_TYPE_SETS = {
-            'Civil Lorry': ['6', '10', '12', '16-civil'],
-            'Tipper Lorry': ['16']
-        };
+        const BUYER_QUEUE = ['Appanna', 'Balaji', 'Chandrashekhar', 'Suresh Kumar', 'Devaraju', 'Basuraju'];
+        const LORRY_OWNERS_LIST = ['ಬಸವರಾಜು', 'ಚೇತನ್', 'ಧನರಾಜ್'];
+        const ADMIN_ROLES_LIST = [
+            'Deputy Director of Mines (DDMG Ballari)',
+            'Mining Geologist & Dispatch Officer',
+            'Superintendent of Police Vigilance Cell'
+        ];
+        
+        const CAP = { '6': 10, '10': 19, '12': 23, '16': 35, '16-civil': 35 };
+        const LORRY_TYPE_SETS = { 'Civil Lorry': ['6', '10', '12', '16-civil'], 'Tipper Lorry': ['16'] };
 
         const FLEET_POOL = [
             { number: 'KA-01-A2234', driver: 'Manjunath H', phone: '9945112233', owner: 'Basuraju Transports' },
@@ -935,15 +1062,317 @@
         const LEASE_DATA = [{ name: "Sri Kumaraswamy Mineral Exports (SKME) Pvt Ltd", id: "EA2141", type: "Iron Ore", status: "active", coords: [15.12, 76.65], isOurMine: true }];
         for(let i=2; i<=32; i++){ LEASE_DATA.push({ name: `Mining Lease Co ${i}`, id: `EA${2100+i}`, type: i%2==0?"Iron Ore":"Manganese", status: i%3==0?"active":i%3==1?"notified":"inactive", coords: [15.0 + Math.random()*0.3, 76.4 + Math.random()*0.4], isOurMine: false }); }
  
-        let db = JSON.parse(localStorage.getItem('Indira_final_db')) || [];
+        let db = JSON.parse(localStorage.getItem('Indira_final_db')) || [
+            {
+                id: 'DISP-1001',
+                miningSite: 'Ramgarhi Mining (Ramgad)',
+                type: 'Iron Ore (Fines)',
+                grade: '55%',
+                totalQty: 1015,
+                remainingQty: 0,
+                dest: 'Janaki Steel Plant Bellary',
+                slot: 'Ramgarhi Mining',
+                loadingPoint: 'Loading Point 1',
+                lorryType: 'Tipper Lorry',
+                status: 'CONFIRMED',
+                date: '2026-11-12',
+                startTime: '06:30',
+                endTime: '09:30',
+                totalLorriesRequired: 29,
+                confirmedBy: 'Appanna',
+                ownerAssigned: 'ಬಸವರಾಜು',
+                lorriesProvided: 20,
+                lorriesShort: 9,
+                allocations: [{
+                    buyer: 'Appanna',
+                    ownerAssigned: 'ಬಸವರಾಜು',
+                    tons: 1015,
+                    ratePerTon: 60,
+                    totalAmount: 60900,
+                    lorriesRequired: 29,
+                    lorriesProvided: 20,
+                    lorriesShort: 9,
+                    location: [15.12, 76.65],
+                    trucks: []
+                }]
+            }
+        ];
+
         let myTrips = JSON.parse(localStorage.getItem('Indira_my_trips')) || [];
         let mapInstance = null, routeMapInstance = null, detailMapInstance = null;
         let userRole = 'manager'; 
         let currentDetailIdx = null;
 
         let currentAllocatingDispatchId = null;
-        let currentRequiredLorries = 0;
+        let currentRequiredLorries = 29;
 
+        // ============================================================
+        // MULTI-ROLE AUTHENTICATION GATEWAY (ALL 4 ROLES)
+        // ============================================================
+        let selectedAuthRole = 'manager';
+        let currentLoginMethod = 'otp';
+        let generatedAuthDemoOTP = null;
+        let authOtpCountdownInterval = null;
+
+        function checkPortalAuthentication() {
+            const activeSession = JSON.parse(localStorage.getItem('Indira_portal_session') || 'null');
+            const overlay = document.getElementById('unified-login-overlay');
+            if (!activeSession) {
+                overlay.classList.remove('hidden');
+                updateAuthContextCard();
+            } else {
+                overlay.classList.add('hidden');
+                userRole = activeSession.role;
+                setupUserRoleView();
+            }
+        }
+
+        function openLoginOverlayForRoleSwitch() {
+            selectedAuthRole = userRole;
+            document.getElementById('unified-login-overlay').classList.remove('hidden');
+            setAuthRole(selectedAuthRole);
+        }
+
+        function setAuthRole(roleKey) {
+            selectedAuthRole = roleKey;
+            ['manager', 'buyer', 'owner', 'admin'].forEach(r => {
+                const btn = document.getElementById(`role-btn-${r}`);
+                if (r === roleKey) {
+                    btn.className = "role-selector-btn active py-2 rounded-xl border transition-all flex flex-col items-center gap-1";
+                } else {
+                    btn.className = "role-selector-btn py-2 rounded-xl text-zinc-400 border border-transparent hover:text-white transition-all flex flex-col items-center gap-1";
+                }
+            });
+            updateAuthContextCard();
+            resetAuthInputFields();
+        }
+
+        function updateAuthContextCard() {
+            const card = document.getElementById('auth-context-card');
+            const emailInput = document.getElementById('auth-email-input');
+            const phoneInput = document.getElementById('auth-phone-input');
+
+            if (selectedAuthRole === 'manager') {
+                card.className = "mb-5 p-4 rounded-2xl border border-yellow-600/40 bg-zinc-900/90";
+                card.innerHTML = `
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 rounded-xl bg-yellow-600/20 text-yellow-500 flex items-center justify-center text-lg border border-yellow-600/30 font-bold"><i class="fa-solid fa-mountain"></i></div>
+                            <div>
+                                <span class="text-[9px] text-zinc-500 uppercase font-bold tracking-widest block">Mining Site Context</span>
+                                <h3 class="text-sm font-extrabold text-white">Ramgarhi Mining</h3>
+                                <p class="text-[11px] text-zinc-400 font-medium">Ramgarhi Mining · Sandur, Ballari</p>
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <span class="text-[9px] bg-green-950/60 text-green-400 border border-green-600/40 px-2 py-0.5 rounded-full font-bold uppercase inline-block mb-1">EA2141</span>
+                            <p class="text-[10px] text-zinc-500">Lessy Admin</p>
+                        </div>
+                    </div>`;
+                emailInput.placeholder = "manager.ramgarhi@gmail.com";
+                phoneInput.value = "9845012345";
+            } 
+            else if (selectedAuthRole === 'buyer') {
+                card.className = "mb-5 p-4 rounded-2xl border border-green-600/40 bg-zinc-900/90";
+                card.innerHTML = `
+                    <div>
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="text-[9px] text-zinc-400 uppercase font-bold tracking-widest block"><i class="fa-solid fa-user-check text-green-400 mr-1"></i> Authorized Mineral Purchaser</span>
+                            <span class="text-[9px] bg-green-900/40 text-green-300 border border-green-500/30 px-2 py-0.5 rounded-full font-bold">QUEUE ACTIVE</span>
+                        </div>
+                        <label class="text-[10px] text-zinc-500 block mb-1 uppercase font-bold">Select Purchaser Identity *</label>
+                        <select id="auth-purchaser-select" class="input-field w-full p-2.5 rounded-xl text-xs font-bold text-white">
+                            ${BUYER_QUEUE.map((b, i) => `<option value="${b}">${i + 1}. ${b} (Ballari Procurement)</option>`).join('')}
+                        </select>
+                    </div>`;
+                emailInput.placeholder = "purchaser.appanna@gmail.com";
+                phoneInput.value = "9986012345";
+            } 
+            else if (selectedAuthRole === 'owner') {
+                card.className = "mb-5 p-4 rounded-2xl border border-blue-600/40 bg-zinc-900/90";
+                card.innerHTML = `
+                    <div>
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="text-[9px] text-zinc-400 uppercase font-bold tracking-widest block"><i class="fa-solid fa-truck-front text-blue-400 mr-1"></i> Registered Fleet Transporter</span>
+                            <span class="text-[9px] bg-blue-900/40 text-blue-300 border border-blue-500/30 px-2 py-0.5 rounded-full font-bold">FLEET POOL</span>
+                        </div>
+                        <label class="text-[10px] text-zinc-500 block mb-1 uppercase font-bold">Select Transporter Identity *</label>
+                        <select id="auth-owner-select" class="input-field w-full p-2.5 rounded-xl text-xs font-bold text-white">
+                            <option value="ಬಸವರಾಜು"> (Basuraju Transports - 200 Lorries Available)</option>
+                            <option value="ಚೇತನ್">(Chetan Logistics - 100 Lorries Available)</option>
+                            <option value="ಧನರಾಜ್"> (Dhanaraj Haulage - 50 Lorries Available)</option>
+                        </select>
+                    </div>`;
+                emailInput.placeholder = "transporter.basuraju@gmail.com";
+                phoneInput.value = "9741012345";
+            } 
+            else if (selectedAuthRole === 'admin') {
+                card.className = "mb-5 p-4 rounded-2xl border border-red-600/40 bg-zinc-900/90";
+                card.innerHTML = `
+                    <div>
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="text-[9px] text-zinc-400 uppercase font-bold tracking-widest block"><i class="fa-solid fa-shield-halved text-red-400 mr-1"></i> Government & Police Mining Authority</span>
+                            <span class="text-[9px] bg-red-900/40 text-red-300 border border-red-500/30 px-2 py-0.5 rounded-full font-bold">VIGILANCE CELL</span>
+                        </div>
+                        <label class="text-[10px] text-zinc-500 block mb-1 uppercase font-bold">Select Officer Cadre *</label>
+                        <select id="auth-admin-select" class="input-field w-full p-2.5 rounded-xl text-xs font-bold text-white">
+                            ${ADMIN_ROLES_LIST.map((a, i) => `<option value="${a}">${a}</option>`).join('')}
+                        </select>
+                    </div>`;
+                emailInput.placeholder = "sp.ballaripolice@karnataka.gov.in";
+                phoneInput.value = "9900266537";
+            }
+        }
+
+        function switchLoginMethod(method) {
+            currentLoginMethod = method;
+            const otpBtn = document.getElementById('method-btn-otp');
+            const emailBtn = document.getElementById('method-btn-email');
+            const otpForm = document.getElementById('auth-form-otp');
+            const emailForm = document.getElementById('auth-form-email');
+
+            if (method === 'otp') {
+                otpBtn.className = "tab-btn active flex-1 py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2";
+                emailBtn.className = "tab-btn flex-1 py-2 rounded-lg text-xs font-bold transition-all text-zinc-400 flex items-center justify-center gap-2";
+                otpForm.classList.remove('hidden');
+                emailForm.classList.add('hidden');
+            } else {
+                emailBtn.className = "tab-btn active flex-1 py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2";
+                otpBtn.className = "tab-btn flex-1 py-2 rounded-lg text-xs font-bold transition-all text-zinc-400 flex items-center justify-center gap-2";
+                emailForm.classList.remove('hidden');
+                otpForm.classList.add('hidden');
+            }
+        }
+
+        function resetAuthInputFields() {
+            document.getElementById('auth-otp-box').classList.add('hidden');
+            document.getElementById('auth-otp-input').value = '';
+            document.getElementById('auth-timer-text').classList.add('hidden');
+            const sendBtn = document.getElementById('btn-send-auth-otp');
+            sendBtn.disabled = false;
+            sendBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+            clearInterval(authOtpCountdownInterval);
+        }
+
+        function sendAuthOTP() {
+            const phone = document.getElementById('auth-phone-input').value.trim();
+            if (!phone || phone.length !== 10 || isNaN(phone)) {
+                showToast("⚠️ ದಯವಿಟ್ಟು 10-ಅಂಕಿಯ ಮೊಬೈಲ್ ಸಂಖ್ಯೆಯನ್ನು ನಮೂದಿಸಿ.", "error");
+                return;
+            }
+
+            generatedAuthDemoOTP = Math.floor(100000 + Math.random() * 900000);
+
+            const otpBox = document.getElementById('auth-otp-box');
+            otpBox.classList.remove('hidden');
+            document.getElementById('auth-demo-otp-hint').innerText = `Demo OTP: ${generatedAuthDemoOTP}`;
+            document.getElementById('auth-otp-input').value = generatedAuthDemoOTP;
+            document.getElementById('auth-otp-input').focus();
+
+            const sendBtn = document.getElementById('btn-send-auth-otp');
+            sendBtn.disabled = true;
+            sendBtn.classList.add('opacity-50', 'cursor-not-allowed');
+
+            let countdown = 60;
+            const timerText = document.getElementById('auth-timer-text');
+            timerText.classList.remove('hidden');
+            timerText.innerText = `OTP sent to +91 ${phone}. Resend in ${countdown}s`;
+
+            clearInterval(authOtpCountdownInterval);
+            authOtpCountdownInterval = setInterval(() => {
+                countdown--;
+                if (countdown <= 0) {
+                    clearInterval(authOtpCountdownInterval);
+                    sendBtn.disabled = false;
+                    sendBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+                    timerText.innerText = "OTP expired. Please request a new OTP.";
+                } else {
+                    timerText.innerText = `OTP sent to +91 ${phone}. Resend in ${countdown}s`;
+                }
+            }, 1000);
+
+            showToast(`📨 6-Digit SMS OTP generated: ${generatedAuthDemoOTP}`, "success");
+        }
+
+        function executeLogin(method) {
+            if (method === 'OTP') {
+                const otp = document.getElementById('auth-otp-input').value.trim();
+                if (!otp || otp.length !== 6) {
+                    showToast("⚠️ Please enter the 6-digit OTP..", "error");
+                    return;
+                }
+                if (otp !== String(generatedAuthDemoOTP)) {
+                    showToast("❌ ತಪ್ಪು OTP ನಮೂದಿಸಲಾಗಿದೆ. ದಯವಿಟ್ಟು ಸರಿಯಾದ OTP ಹಾಕಿ.", "error");
+                    return;
+                }
+            } else {
+                const email = document.getElementById('auth-email-input').value.trim();
+                const pass = document.getElementById('auth-password-input').value.trim();
+                if (!email || !email.includes('@')) {
+                    showToast("⚠️ ದಯವಿಟ್ಟು ಸರಿಯಾದ Email ID ನಮೂದಿಸಿ.", "error");
+                    return;
+                }
+                if (!pass || pass.length < 4) {
+                    showToast("⚠️ ದಯವಿಟ್ಟು Password ನಮೂದಿಸಿ.", "error");
+                    return;
+                }
+            }
+
+            // Determine specific active identity per role
+            let identityName = 'User';
+            if (selectedAuthRole === 'manager') identityName = FIXED_MINE_NAME;
+            else if (selectedAuthRole === 'buyer') identityName = document.getElementById('auth-purchaser-select').value;
+            else if (selectedAuthRole === 'owner') identityName = document.getElementById('auth-owner-select').value;
+            else if (selectedAuthRole === 'admin') identityName = document.getElementById('auth-admin-select').value;
+
+            const session = {
+                role: selectedAuthRole,
+                name: identityName,
+                method: method,
+                loggedInAt: new Date().toISOString(),
+                token: "JWT_" + Math.random().toString(36).substring(2)
+            };
+
+            localStorage.setItem('Indira_portal_session', JSON.stringify(session));
+
+            showToast(`✅ Login successful! Welcome ${identityName}`, "success");
+
+            setTimeout(() => {
+                document.getElementById('unified-login-overlay').classList.add('hidden');
+                userRole = selectedAuthRole;
+                setupUserRoleView();
+                
+                if (userRole === 'manager') showPage('overview');
+                else if (userRole === 'buyer') showPage('flash');
+                else if (userRole === 'owner') showPage('owner-view');
+                else if (userRole === 'admin') showPage('admin');
+            }, 800);
+        }
+
+        function portalSignOut() {
+            if (confirm("Are you sure you want to sign out?")) {
+                localStorage.removeItem('Indira_portal_session');
+                showToast("Signed out successfully.", "success");
+                checkPortalAuthentication();
+            }
+        }
+
+        function showToast(msg, type = "success") {
+            const toast = document.getElementById('toast-msg');
+            toast.innerText = msg;
+            if (type === "success") {
+                toast.className = "fixed bottom-6 right-6 z-[20000] p-4 rounded-2xl text-xs font-bold shadow-2xl flex items-center gap-3 bg-green-900 border border-green-500 text-white transform translate-y-0 opacity-100";
+            } else {
+                toast.className = "fixed bottom-6 right-6 z-[20000] p-4 rounded-2xl text-xs font-bold shadow-2xl flex items-center gap-3 bg-red-900 border border-red-500 text-white transform translate-y-0 opacity-100";
+            }
+            setTimeout(() => {
+                toast.classList.add('translate-y-20', 'opacity-0');
+            }, 3500);
+        }
+
+        // ==========================================
+        // APPLICATION CORE LOGIC
+        // ==========================================
         function autoSetEndTime() {
             const startVal = document.getElementById('f-start').value || '06:30';
             const [hh, mm] = startVal.split(':').map(Number);
@@ -991,10 +1420,10 @@
         }
  
         function getCurrentActiveBuyerName() {
+            const session = JSON.parse(localStorage.getItem('Indira_portal_session') || '{}');
+            if (session.role === 'buyer' && session.name) return session.name;
             const currentOffer = db.find(d => d.status === 'PENDING_OFFER' || d.id === currentAllocatingDispatchId);
-            if (currentOffer && currentOffer.currentBuyer) {
-                return currentOffer.currentBuyer;
-            }
+            if (currentOffer && currentOffer.currentBuyer) return currentOffer.currentBuyer;
             return BUYER_QUEUE[0];
         }
 
@@ -1007,17 +1436,13 @@
                 if(bAvatar) bAvatar.innerText = activeBuyerName.split(' ').map(n => n[0]).join('');
             }
         }
- 
-        const ROLES_CYCLE = ['manager', 'buyer', 'admin', 'owner'];
-        const ROLE_LABELS = { manager: 'Lessy', buyer: 'PURCHASER', admin: 'ADMIN', owner: 'LORRY OWNER' };
- 
-        function switchUserRole() {
-            let nextIdx = (ROLES_CYCLE.indexOf(userRole) + 1) % ROLES_CYCLE.length;
-            userRole = ROLES_CYCLE[nextIdx];
-            const nextUpcomingRole = ROLES_CYCLE[(nextIdx + 1) % ROLES_CYCLE.length];
-            document.getElementById('role-text').innerText = `Switch to ${ROLE_LABELS[nextUpcomingRole]} View`;
-            
+
+        function setupUserRoleView() {
+            const session = JSON.parse(localStorage.getItem('Indira_portal_session') || '{}');
+            const userName = session.name || 'User';
+
             if(userRole === 'buyer') {
+                document.getElementById('role-text').innerText = 'Logged in as Purchaser';
                 refreshBuyerIdentity();
                 document.getElementById('main-nav').innerHTML = `
                     <a href="#" onclick="showPage('flash')" class="flex items-center justify-between p-3 rounded-lg text-sm transition-all text-white bg-zinc-800/50">
@@ -1026,9 +1451,9 @@
                     </a>
                     <a href="#" onclick="showPage('my-dispatches')" class="flex items-center gap-3 p-3 rounded-lg text-sm transition-all text-zinc-400 hover:text-white hover:bg-zinc-800"><i class="fa-solid fa-truck-ramp-box w-5"></i> My Dispatches</a>
                 `;
-                showPage('flash');
             } else if(userRole === 'admin') {
-                refreshAdminMiningAuthority();
+                document.getElementById('role-text').innerText = 'Logged in as Admin';
+                document.getElementById('user-profile').innerHTML = `<span class="bg-red-900/50 text-red-300 text-[10px] px-2 py-1 rounded-full font-bold uppercase border border-red-500/30">Administrator</span><p class="mt-2 font-semibold text-sm text-white">${userName}</p><p class="text-xs text-zinc-500">Ballari Mining Authority</p>`;
                 document.getElementById('header-avatar').innerText = 'AD';
                 document.getElementById('main-nav').innerHTML = `
                     <a href="#" onclick="showPage('admin')" class="flex items-center gap-3 p-3 rounded-lg text-sm transition-all text-white bg-zinc-800/50">
@@ -1038,9 +1463,9 @@
                         <i class="fa-solid fa-truck w-5"></i> Fleet Status (GPS Tracking)
                     </a>
                 `;
-                showPage('admin');
             } else if(userRole === 'owner') {
-                document.getElementById('user-profile').innerHTML = `<span class="bg-amber-900/50 text-amber-300 text-[10px] px-2 py-1 rounded-full font-bold uppercase border border-amber-500/30">Lorry Owner</span><p class="mt-2 font-semibold text-sm text-white">ಬಸವರಾಜು</p><p class="text-xs text-zinc-500">Fleet Operations</p>`;
+                document.getElementById('role-text').innerText = 'Logged in as Lorry Owner';
+                document.getElementById('user-profile').innerHTML = `<span class="bg-blue-900/50 text-blue-300 text-[10px] px-2 py-1 rounded-full font-bold uppercase border border-blue-500/30">Lorry Owner</span><p class="mt-2 font-semibold text-sm text-white">${userName}</p><p class="text-xs text-zinc-500">Fleet Transporter · Ballari</p>`;
                 document.getElementById('header-avatar').innerText = 'LO';
                 document.getElementById('main-nav').innerHTML = `
                     <a href="#" onclick="showPage('owner-view')" id="nav-owner-view" class="flex items-center gap-3 p-3 rounded-lg text-sm transition-all text-white bg-zinc-800/50">
@@ -1050,18 +1475,16 @@
                         <i class="fa-solid fa-users-viewfinder w-5"></i> Lorry Owner Details
                     </a>
                 `;
-                renderOwnerView();
-                showPage('owner-view');
             } else {
-                document.getElementById('user-profile').innerHTML = `<span class="bg-indigo-900/50 text-indigo-300 text-[10px] px-2 py-1 rounded-full font-bold uppercase border border-indigo-500/30">Lessy</span><p class="mt-2 font-semibold text-sm text-white">Lessy</p><p class="text-xs text-zinc-500">Mining Authority - EA2141</p>`;
+                document.getElementById('role-text').innerText = 'Logged in as Lessy';
+                document.getElementById('user-profile').innerHTML = `<span class="bg-indigo-900/50 text-indigo-300 text-[10px] px-2 py-1 rounded-full font-bold uppercase border border-indigo-500/30">Lessy</span><p class="mt-2 font-semibold text-sm text-white">ರಾಮಗಡ ಮೈನಿಂಗ್</p><p class="text-xs text-zinc-500">Site Management · EA2141</p>`;
                 document.getElementById('header-avatar').innerText = 'Lessy';
                 document.getElementById('main-nav').innerHTML = `
                     <a href="#" onclick="showPage('overview')" id="nav-overview" class="flex items-center gap-3 p-3 rounded-lg text-sm transition-all text-white bg-zinc-800/50"><i class="fa-solid fa-chart-pie w-5"></i> Overview</a>
                     <a href="#" onclick="showPage('create')" id="nav-create" class="flex items-center gap-3 p-3 rounded-lg text-sm transition-all text-zinc-400 hover:text-white hover:bg-zinc-800"><i class="fa-solid fa-plus-circle w-5"></i> Create Dispatch</a>
                     <a href="#" onclick="showPage('all-dispatches')" id="nav-all" class="flex items-center gap-3 p-3 rounded-lg text-sm transition-all text-zinc-400 hover:text-white hover:bg-zinc-800"><i class="fa-solid fa-list-check w-5"></i> All Dispatches</a>
-                    <a href="#" onclick="showPage('fleet-status')" id="nav-fleet" class="flex items-center gap-3 p-3 rounded-lg text-sm transition-all text-zinc-400 hover:text-white hover:bg-zinc-800"><i class="fa-solid fa-truck-front w-5"></i> Status</a>
-                    <a href="#" onclick="showPage('leases')" id="nav-leases" class="flex items-center gap-3 p-3 rounded-lg text-sm transition-all text-zinc-400 hover:text-white hover:bg-zinc-800"><i class="fa-solid fa-map-location-dot w-5"></i> Leases</a>`;
-                showPage('overview');
+                    <a href="#" onclick="showPage('fleet-status')" id="nav-fleet" class="flex items-center gap-3 p-3 rounded-lg text-sm transition-all text-zinc-400 hover:text-white hover:bg-zinc-800"><i class="fa-solid fa-truck-front w-5"></i>Purchaser Data</a>
+                    <a href="#" onclick="showPage('leases')" id="nav-leases" class="flex items-center gap-3 p-3 rounded-lg text-sm transition-all text-zinc-400 hover:text-white hover:bg-zinc-800"><i class="fa-solid fa-map-location-dot w-5"></i> Leases Data</a>`;
             }
         }
  
@@ -1136,7 +1559,7 @@
 
             const newDispatch = {
                 id: 'DISP-' + Math.floor(1000 + Math.random() * 9000),
-                miningSite: document.getElementById('f-mining-site').value,
+                miningSite: document.getElementById('f-mining-site').value || 'Ramgarhi Mining (Ramgad)',
                 type: document.getElementById('f-type').value,
                 grade: document.getElementById('f-grade').value.trim() ? document.getElementById('f-grade').value.trim() + '%' : 'N/A',
                 totalQty: totalQty,
@@ -1231,10 +1654,9 @@
             offer.remainingQty -= amount;
             
             offer.status = 'PENDING_ALLOCATION';
-            if(!offer.currentBuyer) {
-                offer.currentBuyer = BUYER_QUEUE[0];
-            }
-            offer.confirmedBy = offer.currentBuyer;
+            const activeBuyer = getCurrentActiveBuyerName();
+            offer.currentBuyer = activeBuyer;
+            offer.confirmedBy = activeBuyer;
 
             localStorage.setItem('Indira_final_db', JSON.stringify(db));
             showPage('fleet-alloc');
@@ -1306,7 +1728,7 @@
         }
  
         function initFleetAllocation(committedQty, offer) {
-            const activeBuyer = offer.currentBuyer || BUYER_QUEUE[0];
+            const activeBuyer = getCurrentActiveBuyerName();
             document.getElementById('alloc-buyer-name').innerText = activeBuyer;
             document.getElementById('alloc-material').innerText = offer.type;
             document.getElementById('alloc-qty').innerText = committedQty + ' T';
@@ -1406,7 +1828,7 @@
                 return;
             }
 
-            const buyerName = dispatch.confirmedBy || dispatch.currentBuyer || BUYER_QUEUE[0];
+            const buyerName = getCurrentActiveBuyerName();
             const qty = parseFloat(document.getElementById('alloc-qty').innerText.replace(' T', '')) || dispatch.totalQty;
             const reqTons = parseInt(document.getElementById('total-req').innerText) || dispatch.totalQty;
             const deliveredCap = extraLorryCapacity();
@@ -1488,7 +1910,7 @@
             const ownerNotification = {
                 id: 'NOTIF-' + Math.floor(1000 + Math.random() * 9000),
                 dispatchId: dispatch.id,
-                miningSite: dispatch.miningSite || 'Mining Site',
+                miningSite: dispatch.miningSite || 'Ramgarhi Mining',
                 locationPoint: [dispatch.slot, dispatch.loadingPoint].filter(Boolean).join(' - ') || 'Loading Point',
                 dropLocation: dispatch.dest || 'Destination',
                 materialType: dispatch.type || 'Iron Ore',
@@ -1544,10 +1966,9 @@
         function refreshAdminMiningAuthority() {
             const el = document.getElementById('user-profile');
             if(userRole !== 'admin' || !el) return;
-            const shortDispatch = db.find(item => getDispatchLorriesShort(item) > 0);
-            const fallback = db[0];
-            const site = (shortDispatch || fallback || {}).miningSite || 'Ballari';
-            el.innerHTML = `<span class="bg-red-900/50 text-red-300 text-[10px] px-2 py-1 rounded-full font-bold uppercase border border-red-500/30">Administrator</span><p class="mt-2 font-semibold text-sm text-white">Verification Officer</p><p class="text-xs text-zinc-500">Mining Authority - ${site}</p>`;
+            const session = JSON.parse(localStorage.getItem('Indira_portal_session') || '{}');
+            const adminName = session.name || 'Mining Officer';
+            el.innerHTML = `<span class="bg-red-900/50 text-red-300 text-[10px] px-2 py-1 rounded-full font-bold uppercase border border-red-500/30">Administrator</span><p class="mt-2 font-semibold text-sm text-white">${adminName}</p><p class="text-xs text-zinc-500">Mining Authority · Ballari</p>`;
         }
  
         function openAnyDispatchDetail(id) {
@@ -1849,7 +2270,179 @@
         }
 
         // ============================================================
-        // RESTORED: FLEET STATUS 2 — LIVE GPS TRACKING & SP ALERTS
+        // LORRY OWNER VIEW & NOTIFICATION LOGIC
+        // ============================================================
+        function renderOwnerView() {
+            const last = db[0] || {};
+            const trip = myTrips[0] || {};
+            const savedNotif = JSON.parse(localStorage.getItem('Indira_owner_notification') || 'null');
+
+            const windowStr = `${last.startTime || '06:30'} - ${last.endTime || '09:30'} AM`;
+            const rateStr = trip.ratePerTon ? `₹${trip.ratePerTon} / T` : (savedNotif && savedNotif.ratePerTon ? savedNotif.ratePerTon : 'Rate Pending');
+            const reqCount = last.totalLorriesRequired || 0;
+            const lorryTypeStr = last.lorryType || 'Tipper Lorry';
+
+            if(savedNotif) {
+                document.getElementById('notif-mining').innerText = savedNotif.miningSite || 'Ramgarhi Mining (Ramgad)';
+                document.getElementById('notif-pickup').innerText = savedNotif.locationPoint || 'Loading Point 1';
+                document.getElementById('notif-drop').innerText = savedNotif.dropLocation || 'Janaki Steel Plant Bellary';
+                document.getElementById('notif-material').innerText = savedNotif.materialType || 'Iron Ore (Fines)';
+                document.getElementById('notif-grade').innerText = savedNotif.grade || '55%';
+                document.getElementById('notif-lorry-type').innerText = savedNotif.lorryType || lorryTypeStr;
+                document.getElementById('notif-req-lorries').innerText = `${savedNotif.lorriesRequired || reqCount} Lorries`;
+                document.getElementById('notif-rate').innerText = savedNotif.ratePerTon || rateStr;
+                document.getElementById('notif-schedule').innerText = savedNotif.scheduleDateTime || `${last.date || ''} (${windowStr})`;
+                document.getElementById('owner-form-req-lorries').innerText = savedNotif.lorriesRequired || reqCount;
+                
+                if(savedNotif.ownerConfirmedCount > 0) {
+                    showCommittedStatus(savedNotif.ownerConfirmedCount, savedNotif.lorriesShort || 0, savedNotif.assignedOwner || 'ಬಸವರಾಜು');
+                }
+
+                if(savedNotif.gateOtp) {
+                    document.getElementById('driver-gate-otp').innerText = savedNotif.gateOtp;
+                }
+            } else {
+                document.getElementById('notif-mining').innerText = last.miningSite || 'Ramgarhi Mining (Ramgad)';
+                document.getElementById('notif-pickup').innerText = [last.slot, last.loadingPoint].filter(Boolean).join(' - ') || 'Loading Point 1';
+                document.getElementById('notif-drop').innerText = last.dest || 'Janaki Steel Plant Bellary';
+                document.getElementById('notif-material').innerText = last.type || 'Iron Ore (Fines)';
+                document.getElementById('notif-grade').innerText = last.grade || '55%';
+                document.getElementById('notif-lorry-type').innerText = lorryTypeStr;
+                document.getElementById('notif-req-lorries').innerText = `${reqCount} Lorries`;
+                document.getElementById('notif-rate').innerText = rateStr;
+                document.getElementById('notif-schedule').innerText = `${last.date || ''} (${windowStr})`;
+                document.getElementById('owner-form-req-lorries').innerText = reqCount;
+            }
+
+            document.getElementById('owner-view-mining').innerText = (savedNotif ? savedNotif.miningSite : last.miningSite) || 'Ramgarhi Mining (Ramgad)';
+            updatePassQrAndShare();
+        }
+
+        function generateDriverPassOTP(isManual = false) {
+            const otp = Math.floor(100000 + Math.random() * 900000);
+            document.getElementById('driver-gate-otp').innerText = otp;
+
+            let notif = JSON.parse(localStorage.getItem('Indira_owner_notification') || '{}');
+            notif.gateOtp = otp;
+            localStorage.setItem('Indira_owner_notification', JSON.stringify(notif));
+
+            updatePassQrAndShare();
+
+            if(isManual) {
+                alert(`🔐 New Gate Pass OTP Generated: ${otp}\nDriver can present this OTP at the Checkpost.`);
+            }
+            return otp;
+        }
+
+        function updatePassQrAndShare() {
+            const last = db[0] || {};
+            const site = document.getElementById('notif-mining').innerText;
+            const drop = document.getElementById('notif-drop').innerText;
+            const lType = document.getElementById('notif-lorry-type').innerText;
+            const rate = document.getElementById('notif-rate').innerText;
+            const sched = document.getElementById('notif-schedule').innerText;
+            const otp = document.getElementById('driver-gate-otp').innerText;
+
+            const qrData = `OWNER_TRIP:${last.id || 'DISP-DEMO'}|OTP:${otp}|SITE:${site}|DEST:${drop}|TYPE:${lType}|RATE:${rate}|TIME:${sched}`;
+            document.getElementById('ov-qr-img').src = `https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=${encodeURIComponent(qrData)}`;
+
+            const waMsg = encodeURIComponent(`📢 *MINING DIGITAL LOADING PASS*\nSite: ${site}\nDrop: ${drop}\nLorry Type: ${lType}\nRate: ${rate}\nTrip Time: ${sched}\n🔐 *Gate Checkpost OTP:* ${otp}\n\n_Note: Please reach mine entry gate 2 hours prior with this OTP._`);
+            document.getElementById('ov-wa-btn').href = `https://wa.me/?text=${waMsg}`;
+        }
+
+        function openOwnerAllocationForm() {
+            document.getElementById('owner-dispatch-input-form').classList.remove('hidden');
+            document.getElementById('owner-sending-lorries').value = '';
+            document.getElementById('owner-sending-lorries').focus();
+        }
+
+        function confirmOwnerLorryCommitment() {
+            const ownerSelect = document.getElementById('owner-select-name');
+            const selectedOwner = ownerSelect.value;
+            const sendingVal = parseInt(document.getElementById('owner-sending-lorries').value);
+
+            if(!sendingVal || sendingVal <= 0) {
+                alert("Please enter a valid number of lorries you are sending for the next schedule.");
+                return;
+            }
+
+            let notif = JSON.parse(localStorage.getItem('Indira_owner_notification') || '{}');
+            const req = notif.lorriesRequired || (db[0] && db[0].totalLorriesRequired) || 0;
+            const shortage = Math.max(0, req - sendingVal);
+
+            const generatedOtp = generateDriverPassOTP(false);
+
+            notif.ownerConfirmedCount = sendingVal;
+            notif.assignedOwner = selectedOwner;
+            notif.lorriesShort = shortage;
+            notif.gateOtp = generatedOtp;
+            localStorage.setItem('Indira_owner_notification', JSON.stringify(notif));
+
+            let targetDispatch = null;
+            if(notif.dispatchId) {
+                targetDispatch = db.find(d => d.id === notif.dispatchId);
+            }
+            if(!targetDispatch && db.length > 0) {
+                targetDispatch = db[0];
+            }
+
+            if(targetDispatch) {
+                targetDispatch.lorriesProvided = sendingVal;
+                targetDispatch.lorriesShort = shortage;
+                targetDispatch.ownerAssigned = selectedOwner;
+                
+                if(targetDispatch.allocations && targetDispatch.allocations.length > 0) {
+                    targetDispatch.allocations[0].lorriesProvided = sendingVal;
+                    targetDispatch.allocations[0].lorriesShort = shortage;
+                    targetDispatch.allocations[0].ownerAssigned = selectedOwner;
+                }
+                localStorage.setItem('Indira_final_db', JSON.stringify(db));
+            }
+
+            if(myTrips.length > 0) {
+                myTrips[0].lorriesProvided = sendingVal;
+                myTrips[0].lorriesShort = shortage;
+                myTrips[0].ownerAssigned = selectedOwner;
+                localStorage.setItem('Indira_my_trips', JSON.stringify(myTrips));
+            }
+
+            showCommittedStatus(sendingVal, shortage, selectedOwner);
+            updateStats();
+
+            alert(`✅ SCHEDULE COMMITTED!\nLorry Owner: ${selectedOwner}\nLorries Sending: ${sendingVal}\nRequired: ${req}\n⚠️ Shortage: ${shortage} Lorries\n\n🔐 Driver Loading Pass OTP: ${generatedOtp}\n\nDigital driver pass & QR Code activated.`);
+        }
+
+        function showCommittedStatus(count, shortage, owner) {
+            document.getElementById('owner-dispatch-input-form').classList.add('hidden');
+            document.getElementById('notif-action-buttons').classList.add('hidden');
+            document.getElementById('notif-accepted-msg').classList.remove('hidden');
+            document.getElementById('owner-confirmed-name-tag').innerText = owner || 'ಬಸವರಾಜು';
+            document.getElementById('owner-confirmed-count-tag').innerText = count;
+
+            const shortageAlertTag = document.getElementById('owner-shortage-alert-tag');
+            if(shortage > 0) {
+                shortageAlertTag.innerHTML = `<i class="fa-solid fa-triangle-exclamation"></i> ${shortage} Lorries Shortage has been reported to Lessy!`;
+                shortageAlertTag.classList.remove('hidden');
+                document.getElementById('notif-badge').innerText = `ACCEPTED: ${count} LORRIES (${shortage} SHORT)`;
+                document.getElementById('notif-badge').className = 'text-[10px] bg-red-700 text-white font-bold px-2 py-0.5 rounded-full';
+            } else {
+                shortageAlertTag.classList.add('hidden');
+                document.getElementById('notif-badge').innerText = `ACCEPTED: ${count} LORRIES (FULL)`;
+                document.getElementById('notif-badge').className = 'text-[10px] bg-green-700 text-white font-bold px-2 py-0.5 rounded-full';
+            }
+        }
+
+        function simulateGateCheck(mode) {
+            const otp = document.getElementById('driver-gate-otp').innerText;
+            if(mode === 'late') {
+                alert("❌ ACCESS DENIED: Late arrival at Entry Gate.\nLorries must arrive at Entry Gate at least 2 hours prior to scheduled window.");
+            } else {
+                alert(`✅ GATE ENTRY GRANTED:\nOTP ${otp !== '------' ? '[' + otp + '] ' : ''}Verified Successfully!\nVehicle verified on schedule. Proceed to Weighbridge & Loading Point.`);
+            }
+        }
+
+        // ============================================================
+        // FLEET STATUS 2 & TELEMETRICS
         // ============================================================
         const POLICE_PHONE_NUMBER = "919900266537"; 
         let detectedAlertIds = new Set(); 
@@ -1864,13 +2457,13 @@
 
         const FLEET2_DRIVERS = [
             { truck: 'KA 134', category: 'tipper', speed: 55 },
-            { truck: 'KA 156', category: 'tipper', speed: 68 }, // Overspeeding (limit 60)
+            { truck: 'KA 156', category: 'tipper', speed: 68 }, 
             { truck: 'KA 178', category: 'tipper', speed: 55 },
             { truck: 'KA 192', category: 'tipper', speed: 55 },
             { truck: 'KA 205', category: 'tipper', speed: 55 },
             { truck: 'KA 219', category: 'civil',  speed: 75 },
             { truck: 'KA 233', category: 'civil',  speed: 75 },
-            { truck: 'KA 247', category: 'civil',  speed: 93 }, // Overspeeding (limit 80)
+            { truck: 'KA 247', category: 'civil',  speed: 93 }, 
             { truck: 'KA 261', category: 'civil',  speed: 75 },
             { truck: 'KA 275', category: 'civil',  speed: 75 }
         ].map((d, i) => {
@@ -1903,10 +2496,9 @@
                 });
             }
             renderFleet2DriverList(); 
-            loadInitialFleet2Alerts(); // RESTORED: Loads overspeed data immediately
+            loadInitialFleet2Alerts();
         }
 
-        // RESTORED: Generates log entry with "Notify SP" WhatsApp button
         function createFleet2LogEntry(driver) {
             const logsContainer = document.getElementById('fleet2-alert-logs');
             if (!logsContainer) return;
@@ -1931,7 +2523,6 @@
             logsContainer.prepend(alertEntry);
         }
 
-        // RESTORED: Loads all overspeed alerts
         function loadInitialFleet2Alerts() {
             const logsContainer = document.getElementById('fleet2-alert-logs');
             if(logsContainer) logsContainer.innerHTML = '';
@@ -2065,177 +2656,6 @@
                 </div>`).join('');
         }
  
-        // LORRY OWNER VIEW & NOTIFICATION LOGIC
-        function renderOwnerView() {
-            const last = db[0] || {};
-            const trip = myTrips[0] || {};
-            const savedNotif = JSON.parse(localStorage.getItem('Indira_owner_notification') || 'null');
-
-            const windowStr = `${last.startTime || '06:30'} - ${last.endTime || '09:30'} AM`;
-            const rateStr = trip.ratePerTon ? `₹${trip.ratePerTon} / T` : (savedNotif && savedNotif.ratePerTon ? savedNotif.ratePerTon : 'Rate Pending');
-            const reqCount = last.totalLorriesRequired || 0;
-            const lorryTypeStr = last.lorryType || 'Tipper Lorry';
-
-            if(savedNotif) {
-                document.getElementById('notif-mining').innerText = savedNotif.miningSite || 'Mining Site';
-                document.getElementById('notif-pickup').innerText = savedNotif.locationPoint || 'Loading Point';
-                document.getElementById('notif-drop').innerText = savedNotif.dropLocation || 'Destination';
-                document.getElementById('notif-material').innerText = savedNotif.materialType || 'Iron Ore';
-                document.getElementById('notif-grade').innerText = savedNotif.grade || 'N/A';
-                document.getElementById('notif-lorry-type').innerText = savedNotif.lorryType || lorryTypeStr;
-                document.getElementById('notif-req-lorries').innerText = `${savedNotif.lorriesRequired || reqCount} Lorries`;
-                document.getElementById('notif-rate').innerText = savedNotif.ratePerTon || rateStr;
-                document.getElementById('notif-schedule').innerText = savedNotif.scheduleDateTime || `${last.date || ''} (${windowStr})`;
-                document.getElementById('owner-form-req-lorries').innerText = savedNotif.lorriesRequired || reqCount;
-                
-                if(savedNotif.ownerConfirmedCount > 0) {
-                    showCommittedStatus(savedNotif.ownerConfirmedCount, savedNotif.lorriesShort || 0, savedNotif.assignedOwner || 'ಬಸವರಾಜು');
-                }
-
-                if(savedNotif.gateOtp) {
-                    document.getElementById('driver-gate-otp').innerText = savedNotif.gateOtp;
-                }
-            } else {
-                document.getElementById('notif-mining').innerText = last.miningSite || 'Mining Site';
-                document.getElementById('notif-pickup').innerText = [last.slot, last.loadingPoint].filter(Boolean).join(' - ') || 'Loading Point';
-                document.getElementById('notif-drop').innerText = last.dest || 'Destination';
-                document.getElementById('notif-material').innerText = last.type || 'Iron Ore';
-                document.getElementById('notif-grade').innerText = last.grade || 'N/A';
-                document.getElementById('notif-lorry-type').innerText = lorryTypeStr;
-                document.getElementById('notif-req-lorries').innerText = `${reqCount} Lorries`;
-                document.getElementById('notif-rate').innerText = rateStr;
-                document.getElementById('notif-schedule').innerText = `${last.date || ''} (${windowStr})`;
-                document.getElementById('owner-form-req-lorries').innerText = reqCount;
-            }
-
-            document.getElementById('owner-view-mining').innerText = (savedNotif ? savedNotif.miningSite : last.miningSite) || 'Mining Site';
-            updatePassQrAndShare();
-        }
-
-        // GENERATE OTP FOR DRIVER DIGITAL LOADING PASS
-        function generateDriverPassOTP(isManual = false) {
-            const otp = Math.floor(100000 + Math.random() * 900000);
-            document.getElementById('driver-gate-otp').innerText = otp;
-
-            let notif = JSON.parse(localStorage.getItem('Indira_owner_notification') || '{}');
-            notif.gateOtp = otp;
-            localStorage.setItem('Indira_owner_notification', JSON.stringify(notif));
-
-            updatePassQrAndShare();
-
-            if(isManual) {
-                alert(`🔐 New Gate Pass OTP Generated: ${otp}\nDriver can present this OTP at the Checkpost.`);
-            }
-            return otp;
-        }
-
-        function updatePassQrAndShare() {
-            const last = db[0] || {};
-            const site = document.getElementById('notif-mining').innerText;
-            const drop = document.getElementById('notif-drop').innerText;
-            const lType = document.getElementById('notif-lorry-type').innerText;
-            const rate = document.getElementById('notif-rate').innerText;
-            const sched = document.getElementById('notif-schedule').innerText;
-            const otp = document.getElementById('driver-gate-otp').innerText;
-
-            const qrData = `OWNER_TRIP:${last.id || 'DISP-DEMO'}|OTP:${otp}|SITE:${site}|DEST:${drop}|TYPE:${lType}|RATE:${rate}|TIME:${sched}`;
-            document.getElementById('ov-qr-img').src = `https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=${encodeURIComponent(qrData)}`;
-
-            const waMsg = encodeURIComponent(`📢 *MINING DIGITAL LOADING PASS*\nSite: ${site}\nDrop: ${drop}\nLorry Type: ${lType}\nRate: ${rate}\nTrip Time: ${sched}\n🔐 *Gate Checkpost OTP:* ${otp}\n\n_Note: Please reach mine entry gate 2 hours prior with this OTP._`);
-            document.getElementById('ov-wa-btn').href = `https://wa.me/?text=${waMsg}`;
-        }
-
-        function openOwnerAllocationForm() {
-            document.getElementById('owner-dispatch-input-form').classList.remove('hidden');
-            document.getElementById('owner-sending-lorries').value = '';
-            document.getElementById('owner-sending-lorries').focus();
-        }
-
-        function confirmOwnerLorryCommitment() {
-            const ownerSelect = document.getElementById('owner-select-name');
-            const selectedOwner = ownerSelect.value;
-            const sendingVal = parseInt(document.getElementById('owner-sending-lorries').value);
-
-            if(!sendingVal || sendingVal <= 0) {
-                alert("Please enter a valid number of lorries you are sending for the next schedule.");
-                return;
-            }
-
-            let notif = JSON.parse(localStorage.getItem('Indira_owner_notification') || '{}');
-            const req = notif.lorriesRequired || (db[0] && db[0].totalLorriesRequired) || 0;
-            const shortage = Math.max(0, req - sendingVal);
-
-            const generatedOtp = generateDriverPassOTP(false);
-
-            notif.ownerConfirmedCount = sendingVal;
-            notif.assignedOwner = selectedOwner;
-            notif.lorriesShort = shortage;
-            notif.gateOtp = generatedOtp;
-            localStorage.setItem('Indira_owner_notification', JSON.stringify(notif));
-
-            let targetDispatch = null;
-            if(notif.dispatchId) {
-                targetDispatch = db.find(d => d.id === notif.dispatchId);
-            }
-            if(!targetDispatch && db.length > 0) {
-                targetDispatch = db[0];
-            }
-
-            if(targetDispatch) {
-                targetDispatch.lorriesProvided = sendingVal;
-                targetDispatch.lorriesShort = shortage;
-                targetDispatch.ownerAssigned = selectedOwner;
-                
-                if(targetDispatch.allocations && targetDispatch.allocations.length > 0) {
-                    targetDispatch.allocations[0].lorriesProvided = sendingVal;
-                    targetDispatch.allocations[0].lorriesShort = shortage;
-                    targetDispatch.allocations[0].ownerAssigned = selectedOwner;
-                }
-                localStorage.setItem('Indira_final_db', JSON.stringify(db));
-            }
-
-            if(myTrips.length > 0) {
-                myTrips[0].lorriesProvided = sendingVal;
-                myTrips[0].lorriesShort = shortage;
-                myTrips[0].ownerAssigned = selectedOwner;
-                localStorage.setItem('Indira_my_trips', JSON.stringify(myTrips));
-            }
-
-            showCommittedStatus(sendingVal, shortage, selectedOwner);
-            updateStats();
-
-            alert(`✅ SCHEDULE COMMITTED!\nLorry Owner: ${selectedOwner}\nLorries Sending: ${sendingVal}\nRequired: ${req}\n⚠️ Shortage: ${shortage} Lorries\n\n🔐 Driver Loading Pass OTP: ${generatedOtp}\n\nDigital driver pass & QR Code activated.`);
-        }
-
-        function showCommittedStatus(count, shortage, owner) {
-            document.getElementById('owner-dispatch-input-form').classList.add('hidden');
-            document.getElementById('notif-action-buttons').classList.add('hidden');
-            document.getElementById('notif-accepted-msg').classList.remove('hidden');
-            document.getElementById('owner-confirmed-name-tag').innerText = owner || 'ಬಸವರಾಜು';
-            document.getElementById('owner-confirmed-count-tag').innerText = count;
-
-            const shortageAlertTag = document.getElementById('owner-shortage-alert-tag');
-            if(shortage > 0) {
-                shortageAlertTag.innerHTML = `<i class="fa-solid fa-triangle-exclamation"></i> ${shortage} Lorries Shortage has been reported to Lessy!`;
-                shortageAlertTag.classList.remove('hidden');
-                document.getElementById('notif-badge').innerText = `ACCEPTED: ${count} LORRIES (${shortage} SHORT)`;
-                document.getElementById('notif-badge').className = 'text-[10px] bg-red-700 text-white font-bold px-2 py-0.5 rounded-full';
-            } else {
-                shortageAlertTag.classList.add('hidden');
-                document.getElementById('notif-badge').innerText = `ACCEPTED: ${count} LORRIES (FULL)`;
-                document.getElementById('notif-badge').className = 'text-[10px] bg-green-700 text-white font-bold px-2 py-0.5 rounded-full';
-            }
-        }
-
-        function simulateGateCheck(mode) {
-            const otp = document.getElementById('driver-gate-otp').innerText;
-            if(mode === 'late') {
-                alert("❌ ACCESS DENIED: Late arrival at Entry Gate.\nLorries must arrive at Entry Gate at least 2 hours prior to scheduled window.");
-            } else {
-                alert(`✅ GATE ENTRY GRANTED:\nOTP ${otp !== '------' ? '[' + otp + '] ' : ''}Verified Successfully!\nVehicle verified on schedule. Proceed to Weighbridge & Loading Point.`);
-            }
-        }
- 
         function initLeaseMap() {
             if(mapInstance) return;
             mapInstance = L.map('map', { zoomControl: false }).setView([15.1394, 76.8877], 11);
@@ -2256,6 +2676,8 @@
         }
  
         window.onload = () => {
+            checkPortalAuthentication();
+
             const tom = new Date(); tom.setDate(tom.getDate() + 1);
             document.getElementById('f-date').value = tom.toISOString().split('T')[0];
             autoSetEndTime();
@@ -2263,18 +2685,6 @@
             renderRecent(); 
             renderDispatchList();
             setInterval(moveFleet2Vehicles, 150);
-            userRole = 'manager';
-            document.getElementById('role-text').innerText = 'Switch to PURCHASER View';
-            document.getElementById('user-profile').innerHTML = `<span class="bg-indigo-900/50 text-indigo-300 text-[10px] px-2 py-1 rounded-full font-bold uppercase border border-indigo-500/30">Lessy</span><p class="mt-2 font-semibold text-sm text-white">Lessy</p><p class="text-xs text-zinc-500">Mining Authority - EA2141</p>`;
-            document.getElementById('header-avatar').innerText = 'Lessy';
-
-            document.getElementById('main-nav').innerHTML = `
-                <a href="#" onclick="showPage('overview')" id="nav-overview" class="flex items-center gap-3 p-3 rounded-lg text-sm transition-all text-white bg-zinc-800/50"><i class="fa-solid fa-chart-pie w-5"></i> Overview</a>
-                <a href="#" onclick="showPage('create')" id="nav-create" class="flex items-center gap-3 p-3 rounded-lg text-sm transition-all text-zinc-400 hover:text-white hover:bg-zinc-800"><i class="fa-solid fa-plus-circle w-5"></i> Create Dispatch</a>
-                <a href="#" onclick="showPage('all-dispatches')" id="nav-all" class="flex items-center gap-3 p-3 rounded-lg text-sm transition-all text-zinc-400 hover:text-white hover:bg-zinc-800"><i class="fa-solid fa-list-check w-5"></i> All Dispatches</a>
-                <a href="#" onclick="showPage('fleet-status')" id="nav-fleet" class="flex items-center gap-3 p-3 rounded-lg text-sm transition-all text-zinc-400 hover:text-white hover:bg-zinc-800"><i class="fa-solid fa-truck-front w-5"></i> Status</a>
-                <a href="#" onclick="showPage('leases')" id="nav-leases" class="flex items-center gap-3 p-3 rounded-lg text-sm transition-all text-zinc-400 hover:text-white hover:bg-zinc-800"><i class="fa-solid fa-map-location-dot w-5"></i> Leases</a>`;
-            showPage('overview');
         };
     </script>
 </body>
