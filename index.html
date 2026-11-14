@@ -1578,6 +1578,7 @@
                 dest: document.getElementById('f-dest').value,
                 slot: document.getElementById('f-slot').value,
                 loadingPoint: document.getElementById('f-loading-point').value,
+                wheelType: document.getElementById('f-wheel-type').value,
                 lorryType: lorryType,
                 status: 'PENDING_OFFER', 
                 date: document.getElementById('f-date').value,
@@ -2721,6 +2722,48 @@ resetWizard = function () {
     onLorryTypeChange();
 };
 // ===== End wheel type addition =====
+        // ===== Purchaser read-only lorry details =====
+function renderExtraLorryOptions() {
+    const offer = db.find(d => d.id === currentAllocatingDispatchId) || {};
+    const wheel = offer.wheelType || '16';
+    const lorryType = offer.lorryType || 'Tipper Lorry';
+
+    extraAllocation = {};
+    extraAllocation[wheel] = currentRequiredLorries;
+
+    document.getElementById('alloc-type-tag').innerText = `${lorryType} · ${wheel} Wheel`;
+    document.getElementById('extra-lorry-type-label').innerText = 'Lessy ಕೇಳಿದ ಲಾರಿ ವಿವರ (ಬದಲಿಸಲು ಸಾಧ್ಯವಿಲ್ಲ)';
+    document.getElementById('counter-max').innerText = currentRequiredLorries;
+    document.getElementById('counter-current').innerText = currentRequiredLorries;
+
+    document.getElementById('extra-lorry-options').innerHTML = `
+        <div class="p-4 bg-zinc-900/50 rounded-xl border border-zinc-800 text-xs space-y-2">
+            <div class="flex justify-between"><span class="text-zinc-500 uppercase font-bold">Lorry Type</span><span class="font-bold text-white">${lorryType}</span></div>
+            <div class="flex justify-between"><span class="text-zinc-500 uppercase font-bold">Wheels</span><span class="font-bold text-white">${wheel} Wheel</span></div>
+            <div class="flex justify-between"><span class="text-zinc-500 uppercase font-bold">Capacity / Lorry</span><span class="font-bold text-white">${CAP[wheel]} T</span></div>
+            <div class="flex justify-between"><span class="text-zinc-500 uppercase font-bold">Lorries Required</span><span class="font-bold text-yellow-500 text-sm">${currentRequiredLorries}</span></div>
+        </div>`;
+}
+
+function calculateFleet() {
+    const reqTons = parseInt(document.getElementById('total-req').innerText) || 0;
+    document.getElementById('total-cap').innerText = reqTons + ' T';
+    document.getElementById('total-lorries').innerText = extraLorryCount();
+    document.getElementById('final-shortage').classList.add('hidden');
+    const btn = document.getElementById('confirm-trip-btn');
+    btn.disabled = false;
+    btn.className = "flex-1 py-4 rounded-xl bg-yellow-600 text-black font-bold hover:bg-yellow-500 transition-all cursor-pointer";
+}
+
+const _origConfirmFleetTrip = confirmFleetTrip;
+confirmFleetTrip = function () {
+    const tons = document.getElementById('total-req').innerText;
+    const lorries = document.getElementById('total-lorries').innerText;
+    const tag = document.getElementById('alloc-type-tag').innerText;
+    if (!confirm(`Total Capacity: ${tons}\nLorries Required: ${lorries} (${tag})\n\nAre you sure you want to confirm this trip?`)) return;
+    _origConfirmFleetTrip();
+};
+// ===== End purchaser read-only lorry details =====
  
         window.onload = () => {
             localStorage.removeItem('Indira_portal_session');
