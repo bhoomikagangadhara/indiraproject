@@ -245,17 +245,27 @@
                                    <option value="OLD ZTC">OLD ZTC</option>
                                 </select>
                             </div>
-                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
-                                <div><label class="text-[10px] text-zinc-500 mb-1 block uppercase font-bold">Ore Type *</label><select id="f-type" class="input-field w-full p-2.5 rounded-lg text-sm required"><option value="">Select ore type</option><option value="Iron Ore (Fines)">Iron Ore (Fines)</option><option value="Iron Ore (Lumps)">Iron Ore (Lumps)</option><option value="Iron Ore (Calibrated)">Iron Ore (Calibrated)</option><option value="Manganese">Manganese</option></select></div>
-                                <div>
-                                    <label class="text-[10px] text-zinc-500 mb-1 block uppercase font-bold">Lorry Type *</label>
-                                    <select id="f-lorry-type" onchange="calculateLorries()" class="input-field w-full p-2.5 rounded-lg text-sm required">
-                                        <option value="">Select lorry type</option>
-                                        <option value="Tipper Lorry">Tipper Lorry (16 Wheels - 35T)</option>
-                                        <option value="Civil Lorry">Civil Lorry (6 to 16 Wheels)</option>
-                                    </select>
-                                </div>
-                            </div>
+                           <div class="mb-4">
+    <label class="text-[10px] text-zinc-500 mb-1 block uppercase font-bold">Ore Type *</label>
+    <select id="f-type" class="input-field w-full p-2.5 rounded-lg text-sm required">
+        <option value="">Select ore type</option>
+        <option value="Iron Ore (Fines)">Iron Ore (Fines)</option>
+        <option value="Iron Ore (Lumps)">Iron Ore (Lumps)</option>
+        <option value="Iron Ore (Calibrated)">Iron Ore (Calibrated)</option>
+        <option value="Manganese">Manganese</option>
+    </select>
+</div>
+<div class="mb-4">
+    <label class="text-[10px] text-zinc-500 mb-1 block uppercase font-bold">Lorry Type *</label>
+    <div class="flex gap-2">
+        <select id="f-lorry-type" onchange="onLorryTypeChange()" class="input-field flex-1 p-2.5 rounded-lg text-sm required">
+            <option value="">Select lorry type</option>
+            <option value="Tipper Lorry">Tipper Lorry (6 to 16 Wheels)</option>
+            <option value="Civil Lorry">Civil Lorry (16 Wheels only)</option>
+        </select>
+        <select id="f-wheel-type" onchange="calculateLorries()" class="input-field flex-1 p-2.5 rounded-lg text-sm hidden"></select>
+    </div>
+</div>
                             <div class="mb-4">
                                 <label class="text-[10px] text-zinc-500 mb-1 block uppercase font-bold">Grade *</label>
                                 <select id="f-grade" class="input-field w-full p-2.5 rounded-lg text-sm required">
@@ -2674,6 +2684,42 @@
             const q = document.getElementById('lease-search').value.toLowerCase();
             renderLeaseList(LEASE_DATA.filter(l => l.name.toLowerCase().includes(q) || l.id.toLowerCase().includes(q)));
         }
+        // ===== Wheel type addition =====
+const WHEEL_OPTIONS = {
+    'Tipper Lorry': [['6','6 Wheel - 10 T'],['10','10 Wheel - 19 T'],['12','12 Wheel - 23 T'],['16','16 Wheel - 35 T']],
+    'Civil Lorry': [['16','16 Wheel - 35 T']]
+};
+
+function onLorryTypeChange() {
+    const type = document.getElementById('f-lorry-type').value;
+    const wheel = document.getElementById('f-wheel-type');
+    if (!type) {
+        wheel.classList.add('hidden');
+        wheel.classList.remove('required');
+        wheel.innerHTML = '';
+    } else {
+        const opts = WHEEL_OPTIONS[type];
+        wheel.innerHTML = (opts.length > 1 ? '<option value="">Select wheels</option>' : '') +
+            opts.map(o => `<option value="${o[0]}">${o[1]}</option>`).join('');
+        wheel.classList.remove('hidden');
+        wheel.classList.add('required');
+    }
+    calculateLorries();
+}
+
+function calculateLorries() {
+    const qty = parseInt(document.getElementById('f-qty').value) || 0;
+    const capacity = CAP[document.getElementById('f-wheel-type').value] || 35;
+    const totalLorries = capacity > 0 ? Math.ceil(qty / capacity) : 0;
+    document.getElementById('display-lorries').innerText = totalLorries.toLocaleString();
+}
+
+const _origResetWizard = resetWizard;
+resetWizard = function () {
+    _origResetWizard();
+    onLorryTypeChange();
+};
+// ===== End wheel type addition =====
  
         window.onload = () => {
             checkPortalAuthentication();
